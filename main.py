@@ -1,14 +1,26 @@
 import asyncio
 from mcp.server.fastmcp import FastMCP
 from typing import Any, Dict, List, Optional, Literal
-import twitter
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
+from starlette.middleware import Middleware
+from starlette.requests import Request
+from contextvars import ContextVar
+from dataclasses import dataclass
+from twikit import Client
+import logging
+import uvicorn
 import config
+
+logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
   name="twitter-mcp-server",
   host=config.HOST,
   port=int(config.PORT or "8080"),
+  streamable_http_path="/mcp"
 )
+mcp.streamable_http_app()
 
 @mcp.tool(description="Get recent tweets from a user")
 async def get_tweets(
@@ -34,11 +46,10 @@ async def get_profile(
   # Implementation here
   pass
 
-
 @mcp.tool(description="Search for tweets by hashtag or keyword")
 async def search_tweets(
   query: str,
-  mode: Literal["latest", "top"] = "latest",
+  mode: Literal["Latest", "Top"] = "Latest",
   count: Optional[int] = 10
 ) -> str:
   """
@@ -47,7 +58,15 @@ async def search_tweets(
     mode: Search mode - 'latest' for most recent tweets or 'top' for most relevant tweets
     count: Number of tweets to retrieve (default: 10, max: 50)
   """
-  
+  auth = get_auth_context()
+  if auth is None:
+    logging.warning("no auth")
+    return
+  client = Client('en-US')
+  client.set_cookies({"auth_token": auth.auth_token, "cf0": auth.cf0})
+  tweets = await client.search_tweet(query, mode, count=count)
+
+  logger.warning(f"t: {tweets}")
 
 @mcp.tool(description="Like or unlike a tweet")
 async def like_tweet(
@@ -175,8 +194,80 @@ async def create_thread(
     # Implementation here
     pass
 
-if __name__ == "__main__":
+_auth_context: ContextVar[Optional['AuthContext']] = ContextVar('auth_context', default=None)
+
+@dataclass
+class AuthContext:
+  auth_token: str
+  cf0: str
+
+def set_auth_context(auth: Optional[AuthContext]) -> None:
+  """Set the authentication context for the current async context."""
+  _auth_context.set(auth)
+
+def get_auth_context() -> Optional[AuthContext]:
+  """Get the authentication context from the current async context."""
+  return _auth_context.get()
+
+class AuthMiddleware(BaseHTTPMiddleware):
+  async def dispatch(self, request: Request, call_next):
+    if request.url.path in ["/health", "/docs"]:
+      return await call_next(request)
+    
+    auth_header = request.headers.get("Authorization")
+    
+    if not auth_header:
+      return JSONResponse(
+        status_code=401,
+        content={"error": "Missing Authorization header"}
+      )
+    
+    parts = auth_header.split()
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        return JSONResponse(
+          status_code=401,
+          content={"error": "Invalid Authorization header format"}
+        )
+    
+    token = parts[1]
+    token_parts = token.split(sep=":")
+    auth_token = token_parts[0]
+    csrf_token = token_parts[1]
+    
+    if not self.validate_auth_token(auth_token) or not self.validate_csrf_token(csrf_token):
+      return JSONResponse(
+        status_code=401,
+        content={"error": "Invalid or expired token"}
+      )
+    
+    client = Client("en-US")
+    client.set_cookies({"auth_token": auth_token, "cf0": csrf_token})
+    await client.user()
+
+    set_auth_context(AuthContext(auth_token, csrf_token))    
+    response = await call_next(request)
+    return response
+  
+  def validate_auth_token(self, token: str) -> bool:
+    return len(token) > 0
+  
+  def validate_csrf_token(self, token: str) -> bool:
+    return len(token) > 0
+
+async def main():
   if config.PORT:
-    asyncio.run(mcp.run_streamable_http_async())
+    mcp_app = mcp.streamable_http_app()
+    mcp_app.add_middleware(Middleware(AuthMiddleware))
+    config = uvicorn.Config(
+      mcp_app,
+      host=mcp.settings.host,
+      port=mcp.settings.port,
+      log_level=mcp.settings.log_level.lower(),
+    )
+    server = uvicorn.Server(config)
+    await server.serve()
   else:
-    asyncio.run(mcp.run_stdio_async())
+    await mcp.run_stdio_async()
+
+if __name__ == "__main__":
+  asyncio.run(main())
