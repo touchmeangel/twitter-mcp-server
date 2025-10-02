@@ -29,7 +29,7 @@ async def get_profile(
 ) -> str:
   """
   Args:
-      username: Username of the user (without @)
+    username: Username of the user (without @)
   """
   # Implementation here
   pass
