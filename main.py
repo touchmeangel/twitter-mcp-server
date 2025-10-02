@@ -2,12 +2,13 @@ import asyncio
 from mcp.server.fastmcp import FastMCP
 from typing import Any, Dict, List, Optional, Literal
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 from starlette.middleware import Middleware
 from starlette.requests import Request
 from contextvars import ContextVar
 from dataclasses import dataclass
-from twikit import Client
+from twikit import Client, errors
 import logging
 import uvicorn
 from config import HOST, PORT
@@ -211,6 +212,9 @@ def get_auth_context() -> Optional[AuthContext]:
 
 class AuthMiddleware(BaseHTTPMiddleware):
   async def dispatch(self, request: Request, call_next):
+    if request.method == "OPTIONS":
+      return await call_next(request)
+  
     if request.url.path in ["/health", "/docs"]:
       return await call_next(request)
     
@@ -224,10 +228,10 @@ class AuthMiddleware(BaseHTTPMiddleware):
     
     parts = auth_header.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
-        return JSONResponse(
-          status_code=401,
-          content={"error": "Invalid Authorization header format"}
-        )
+      return JSONResponse(
+        status_code=401,
+        content={"error": "Invalid Authorization header format"}
+      )
     
     token = parts[1]
     token_parts = token.split(sep=":")
@@ -240,10 +244,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
         content={"error": "Invalid or expired token"}
       )
     
-    client = Client("en-US")
-    client.set_cookies({"auth_token": auth_token, "cf0": csrf_token})
-    await client.user()
-
     set_auth_context(AuthContext(auth_token, csrf_token))    
     response = await call_next(request)
     return response
@@ -257,7 +257,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
 async def main():
   if PORT:
     mcp_app = mcp.streamable_http_app()
-    mcp_app.add_middleware(Middleware(AuthMiddleware))
+    mcp_app.add_middleware(AuthMiddleware)
+    mcp_app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
     config = uvicorn.Config(
       mcp_app,
       host=mcp.settings.host,
