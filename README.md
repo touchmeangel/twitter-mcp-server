@@ -63,7 +63,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 To test tools use
 ```bash
-npx @modelcontextprotocol/inspector docker run -i --rm --name twitter-mcp-server -e APP_PORT=3000 -p 3000:3000 touchmeangel/twitter-mcp-server
+npx @modelcontextprotocol/inspector
 ```
 
 ## Error Handling

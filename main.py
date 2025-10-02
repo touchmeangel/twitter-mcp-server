@@ -10,14 +10,14 @@ from dataclasses import dataclass
 from twikit import Client
 import logging
 import uvicorn
-import config
+from config import HOST, PORT
 
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
   name="twitter-mcp-server",
-  host=config.HOST,
-  port=int(config.PORT or "8080"),
+  host=HOST,
+  port=int(PORT or "8080"),
   streamable_http_path="/mcp"
 )
 mcp.streamable_http_app()
@@ -255,7 +255,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     return len(token) > 0
 
 async def main():
-  if config.PORT:
+  if PORT:
     mcp_app = mcp.streamable_http_app()
     mcp_app.add_middleware(Middleware(AuthMiddleware))
     config = uvicorn.Config(
