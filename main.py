@@ -52,7 +52,7 @@ async def search_tweets(
   query: str,
   mode: Literal["Latest", "Top"] = "Latest",
   count: Optional[int] = 10
-) -> str:
+) -> dict:
   """
   Args:
     query: Search query (hashtag or keyword). For hashtags, include the # symbol
@@ -61,11 +61,23 @@ async def search_tweets(
   """
   auth = get_auth_context()
   if auth is None:
-    logging.warning("no auth")
-    return
+    return {
+      "error": "Authentication required",
+      "error_code": "AUTH_REQUIRED",
+      "success": False
+    }
+
+  logging.warning(f"a: {auth.auth_token}, c: {auth.cf0}")
   client = Client('en-US')
   client.set_cookies({"auth_token": auth.auth_token, "cf0": auth.cf0})
-  tweets = await client.search_tweet(query, mode, count=count)
+  try:
+    tweets = await client.search_tweet(query, mode, count=count)
+  except errors.Forbidden:
+    return {
+      "error": "Authentication required",
+      "error_code": "AUTH_REQUIRED",
+      "success": False
+    }
 
   logger.warning(f"t: {tweets}")
 
