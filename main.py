@@ -227,16 +227,13 @@ class AuthMiddleware(BaseHTTPMiddleware):
     if request.method == "OPTIONS":
       return await call_next(request)
   
-    if request.url.path in ["/health", "/docs"]:
+    if request.url.path in ["/health", "/docs", "/.well-known/health"]:
       return await call_next(request)
     
     auth_header = request.headers.get("Authorization")
     
     if not auth_header:
-      return JSONResponse(
-        status_code=401,
-        content={"error": "Missing Authorization header"}
-      )
+      return await call_next(request)
     
     parts = auth_header.split()
     if len(parts) != 2 or parts[0].lower() != "bearer":
@@ -270,7 +267,7 @@ async def main():
   if PORT:
     mcp_app = mcp.streamable_http_app()
     mcp_app.add_middleware(AuthMiddleware)
-    mcp_app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+    mcp_app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Session-ID", "mcp-session-id"])
     config = uvicorn.Config(
       mcp_app,
       host=mcp.settings.host,
