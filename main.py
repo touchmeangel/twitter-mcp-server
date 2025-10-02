@@ -6,7 +6,7 @@ import config
 mcp = FastMCP(
   name="twitter-mcp-server",
   host=config.HOST,
-  port=int(config.PORT),
+  port=int(config.PORT or "8080"),
 )
 
 @mcp.tool(description="Get recent tweets from a user")
@@ -177,4 +177,7 @@ async def create_thread(
     pass
 
 if __name__ == "__main__":
-  asyncio.run(mcp.run_streamable_http_async())
+  if config.PORT:
+    asyncio.run(mcp.run_streamable_http_async())
+  else:
+    asyncio.run(mcp.run_stdio_async())
