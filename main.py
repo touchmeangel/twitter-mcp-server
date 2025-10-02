@@ -5,10 +5,8 @@ import config
 
 mcp = FastMCP(
   name="twitter-mcp-server",
-  description="twitter client server",
   host=config.HOST,
   port=int(config.PORT),
-  reload=True,
 )
 
 @mcp.tool(description="Get recent tweets from a user")
