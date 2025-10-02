@@ -50,8 +50,8 @@ async def get_profile(
 @mcp.tool(description="Search for tweets by hashtag or keyword")
 async def search_tweets(
   query: str,
-  mode: Literal["Latest", "Top"] = "Latest",
-  count: Optional[int] = 10
+  mode: Literal["Latest", "Top"] = "Top",
+  count: Optional[int] = 30
 ) -> dict:
   """
   Args:
@@ -61,24 +61,23 @@ async def search_tweets(
   """
   auth = get_auth_context()
   if auth is None:
-    return {
-      "error": "Authentication required",
-      "error_code": "AUTH_REQUIRED",
-      "success": False
-    }
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
 
   client = Client('en-US')
   client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
   try:
     tweets = await client.search_tweet(query, mode, count=count)
   except errors.Forbidden:
-    return {
-      "error": "Authentication required",
-      "error_code": "AUTH_REQUIRED",
-      "success": False
-    }
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
 
-  logger.warning(f"t: {tweets}")
+  result = []
+  for tweet in tweets:
+    result.append({"id": tweet.id, "in_reply_to": tweet.in_reply_to, "text": tweet.text, "lang": tweet.lang, "created_at": tweet.created_at, "view_count": tweet.view_count, "favorite_count": tweet.favorite_count, "reply_count": tweet.reply_count, "retweet_count": tweet.retweet_count})
+  return {
+    "error": None,
+    "success": True,
+    "result": result,
+  }
 
 @mcp.tool(description="Like or unlike a tweet")
 async def like_tweet(
