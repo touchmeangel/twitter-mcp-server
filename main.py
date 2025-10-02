@@ -67,9 +67,8 @@ async def search_tweets(
       "success": False
     }
 
-  logging.warning(f"a: {auth.auth_token}, c: {auth.cf0}")
   client = Client('en-US')
-  client.set_cookies({"auth_token": auth.auth_token, "cf0": auth.cf0})
+  client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
   try:
     tweets = await client.search_tweet(query, mode, count=count)
   except errors.Forbidden:
@@ -212,7 +211,7 @@ _auth_context: ContextVar[Optional['AuthContext']] = ContextVar('auth_context', 
 @dataclass
 class AuthContext:
   auth_token: str
-  cf0: str
+  ct0: str
 
 def set_auth_context(auth: Optional[AuthContext]) -> None:
   """Set the authentication context for the current async context."""
