@@ -140,7 +140,7 @@ async def like_tweet(
   """
   Args:
     tweet_id: ID of the tweet to like/unlike
-    action: Whether to like or unlike the tweet
+    action: Whether to \"like\" or \"unlike\" the tweet
   """
   auth = get_auth_context()
   if auth is None:
@@ -167,10 +167,24 @@ async def retweet(
   """
   Args:
     tweet_id: ID of the tweet to retweet/undo retweet
-    action: Whether to retweet or undo the retweet
+    action: Whether to \"retweet\" or \"undo\" the retweet
   """
-  # Implementation here
-  pass
+  auth = get_auth_context()
+  if auth is None:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+
+  client = Client('en-US')
+  client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
+
+  try:
+    if action == "retweet":
+      await client.retweet(tweet_id)
+    elif action == "undo":
+      await client.delete_retweet(tweet_id)
+  except errors.Forbidden:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+
+  return json.dumps({"status": "success"})
 
 
 @mcp.tool(description="Post a new tweet, optionally with media or as a quote tweet")
