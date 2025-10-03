@@ -12,6 +12,7 @@ from twikit import Client, errors
 import logging
 import uvicorn
 from config import HOST, PORT
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ async def search_tweets(
   query: str,
   mode: Literal["Latest", "Top"] = "Top",
   count: Optional[int] = 30
-) -> dict:
+) -> str:
   """
   Args:
     query: Search query (hashtag or keyword). For hashtags, include the # symbol
@@ -73,11 +74,11 @@ async def search_tweets(
   result = []
   for tweet in tweets:
     result.append({"id": tweet.id, "in_reply_to": tweet.in_reply_to, "text": tweet.text, "lang": tweet.lang, "created_at": tweet.created_at, "view_count": tweet.view_count, "favorite_count": tweet.favorite_count, "reply_count": tweet.reply_count, "retweet_count": tweet.retweet_count})
-  return {
+  return json.dumps({
     "error": None,
     "success": True,
     "result": result,
-  }
+  })
 
 @mcp.tool(description="Like or unlike a tweet")
 async def like_tweet(
@@ -112,7 +113,6 @@ async def post_tweet(
   text: str,
   reply_to_tweet_id: Optional[str] = None,
   quote_tweet_id: Optional[str] = None,
-  media: Optional[List[dict]] = None,
   hide_link_preview: bool = False
 ) -> str:
   """
@@ -195,7 +195,7 @@ async def follow_user(
 
 @mcp.tool(description="Create a Twitter thread (a series of connected tweets)")
 async def create_thread(
-    tweets: List[dict]
+    tweets: list
 ) -> str:
     """
     Args:
