@@ -26,12 +26,12 @@ mcp.streamable_http_app()
 @mcp.tool(description="Get recent tweets from a user")
 async def get_tweets(
   username: str,
-  count: str = "10"
+  count: str = "30"
 ) -> str:
   """
   Args:
     username: Username of the user (without @)
-    count: Number of tweets to retrieve (default: 10, max: 50)
+    count: Number of tweets to retrieve (default: 30, max: 50)
   """
   try:
     count_int = int(count)
@@ -49,8 +49,37 @@ async def get_profile(
   Args:
     username: Username of the user (without @)
   """
-  # Implementation here
-  pass
+  auth = get_auth_context()
+  if auth is None:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+
+  client = Client('en-US')
+  client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
+
+  try:
+    user = await client.get_user_by_screen_name(username)
+  except errors.Forbidden:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+  
+  return json.dumps({
+    "id": user.id,
+    "name": user.name,
+    "username": user.screen_name,
+    "created_at": user.created_at,
+    "profile_image_url": user.profile_image_url,
+    "url": user.url,
+    "location": user.location,
+    "description": user.description,
+    "description_urls": user.description_urls,
+    "is_blue_verified": user.is_blue_verified,
+    "verified": user.verified,
+    "possibly_sensitive": user.possibly_sensitive,
+    "can_dm": user.can_dm,
+    "followers_count": user.followers_count,
+    "fast_followers_count": user.fast_followers_count,
+    "normal_followers_count": user.normal_followers_count,
+    "following_count": user.following_count
+  })
 
 @mcp.tool(description="Search for tweets by hashtag or keyword")
 async def search_tweets(
@@ -84,7 +113,7 @@ async def search_tweets(
 
   result = []
   for tweet in tweets:
-    result.append({"id": tweet.id, "in_reply_to": tweet.in_reply_to, "text": tweet.text, "lang": tweet.lang, "created_at": tweet.created_at, "view_count": tweet.view_count, "favorite_count": tweet.favorite_count, "reply_count": tweet.reply_count, "retweet_count": tweet.retweet_count})
+    result.append({"id": tweet.id, "in_reply_to": tweet.in_reply_to, "author_username": tweet.user.screen_name, "text": tweet.text, "lang": tweet.lang, "created_at": tweet.created_at, "view_count": tweet.view_count, "favorite_count": tweet.favorite_count, "reply_count": tweet.reply_count, "retweet_count": tweet.retweet_count})
   return json.dumps(result)
 
 @mcp.tool(description="Like or unlike a tweet")
