@@ -60,7 +60,7 @@ async def search_tweets(
   Args:
     query: Search query (hashtag or keyword). For hashtags, include the # symbol
     mode: Search mode - 'latest' for most recent tweets or 'top' for most relevant tweets
-    count: Number of tweets to retrieve (default: 10, max: 50)
+    count: Number of tweets to retrieve (default: 30, max: 50)
   """
   try:
     count_int = int(count)
@@ -80,11 +80,7 @@ async def search_tweets(
   result = []
   for tweet in tweets:
     result.append({"id": tweet.id, "in_reply_to": tweet.in_reply_to, "text": tweet.text, "lang": tweet.lang, "created_at": tweet.created_at, "view_count": tweet.view_count, "favorite_count": tweet.favorite_count, "reply_count": tweet.reply_count, "retweet_count": tweet.retweet_count})
-  return json.dumps({
-    "error": None,
-    "success": True,
-    "result": result,
-  })
+  return json.dumps(result)
 
 @mcp.tool(description="Like or unlike a tweet")
 async def like_tweet(
