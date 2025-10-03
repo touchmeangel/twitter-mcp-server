@@ -39,7 +39,23 @@ async def get_tweets(
     raise RuntimeError(f"Invalid argument (count)")
   if count_int > 50 or count_int <= 0:
     raise RuntimeError(f"Invalid argument (count)")
-  pass
+  
+  auth = get_auth_context()
+  if auth is None:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+
+  client = Client('en-US')
+  client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
+  try:
+    user = await client.get_user_by_screen_name(username)
+    tweets = await client.get_user_tweets(user.id, "Tweets", count=count_int)
+  except errors.Forbidden:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+
+  result = []
+  for tweet in tweets:
+    result.append({"id": tweet.id, "in_reply_to": tweet.in_reply_to, "author_username": tweet.user.screen_name, "text": tweet.text, "lang": tweet.lang, "created_at": tweet.created_at, "view_count": tweet.view_count, "favorite_count": tweet.favorite_count, "reply_count": tweet.reply_count, "retweet_count": tweet.retweet_count})
+  return json.dumps(result)
 
 @mcp.tool(description="Get a Twitter user's profile information")
 async def get_profile(
