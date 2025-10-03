@@ -142,9 +142,22 @@ async def like_tweet(
     tweet_id: ID of the tweet to like/unlike
     action: Whether to like or unlike the tweet
   """
-  # Implementation here
-  pass
+  auth = get_auth_context()
+  if auth is None:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
 
+  client = Client('en-US')
+  client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
+
+  try:
+    if action == "like":
+      await client.favorite_tweet(tweet_id)
+    elif action == "unlike":
+      await client.unfavorite_tweet(tweet_id)
+  except errors.Forbidden:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+
+  return json.dumps({"status": "success"})
 
 @mcp.tool(description="Retweet or undo retweet of a tweet")
 async def retweet(
