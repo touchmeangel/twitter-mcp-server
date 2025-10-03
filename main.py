@@ -26,14 +26,17 @@ mcp.streamable_http_app()
 @mcp.tool(description="Get recent tweets from a user")
 async def get_tweets(
   username: str,
-  count: int = 10
+  count: str = "10"
 ) -> str:
   """
   Args:
     username: Username of the user (without @)
     count: Number of tweets to retrieve (default: 10, max: 50)
   """
-  # Implementation here
+  try:
+    count_int = int(count)
+  except ValueError:
+    raise RuntimeError(f"Invalid argument (count)")  
   pass
 
 @mcp.tool(description="Get a Twitter user's profile information")
@@ -51,7 +54,7 @@ async def get_profile(
 async def search_tweets(
   query: str,
   mode: Literal["Latest", "Top"] = "Top",
-  count: int = 30
+  count: str = "30"
 ) -> str:
   """
   Args:
@@ -59,6 +62,10 @@ async def search_tweets(
     mode: Search mode - 'latest' for most recent tweets or 'top' for most relevant tweets
     count: Number of tweets to retrieve (default: 10, max: 50)
   """
+  try:
+    count_int = int(count)
+  except ValueError:
+    raise RuntimeError(f"Invalid argument (count)")  
   auth = get_auth_context()
   if auth is None:
     raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
@@ -66,7 +73,7 @@ async def search_tweets(
   client = Client('en-US')
   client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
   try:
-    tweets = await client.search_tweet(query, mode, count=count)
+    tweets = await client.search_tweet(query, mode, count=count_int)
   except errors.Forbidden:
     raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
 
@@ -112,7 +119,7 @@ async def post_tweet(
   text: str,
   reply_to_tweet_id: str = "",
   quote_tweet_id: str = "",
-  hide_link_preview: bool = False
+  hide_link_preview: str = "false"
 ) -> str:
   """
   Args:
@@ -122,6 +129,7 @@ async def post_tweet(
     media: Optional array of media items with 'data' (base64) and 'media_type' (MIME type)
     hide_link_preview: Whether to hide link previews in the tweet
   """
+  hide_link_preview_bool = hide_link_preview == "true"
   # Implementation here
   pass
 
@@ -137,7 +145,7 @@ async def get_trends() -> str:
 async def get_user_relationships(
   username: str,
   relationship_type: Literal["followers", "following"],
-  count: int = 10
+  count: str = "10"
 ) -> str:
   """
   Args:
@@ -145,6 +153,10 @@ async def get_user_relationships(
     relationship_type: Whether to get followers or following list
     count: Number of profiles to retrieve (default: 10, max: 50)
   """
+  try:
+    count_int = int(count)
+  except ValueError:
+    raise RuntimeError(f"Invalid argument (count)")  
   # Implementation here
   pass
 
@@ -153,7 +165,7 @@ async def get_user_relationships(
 async def get_timeline(
   timeline_type: Literal["home", "following", "user"],
   username: str = "",
-  count: int = 10
+  count: str = "10"
 ) -> str:
   """
   Args:
@@ -161,6 +173,10 @@ async def get_timeline(
     username: Username of the user whose timeline to fetch (required only for timeline_type='user')
     count: Number of tweets to retrieve (default: 10, max: 50)
   """
+  try:
+    count_int = int(count)
+  except ValueError:
+    raise RuntimeError(f"Invalid argument (count)")  
   # Implementation here
   pass
 
@@ -168,13 +184,17 @@ async def get_timeline(
 @mcp.tool(description="Get tweets from a Twitter list")
 async def get_list_tweets(
   list_id: str,
-  count: int = 10
+  count: str = "10"
 ) -> str:
   """
   Args:
     list_id: ID of the Twitter list to fetch tweets from
     count: Number of tweets to retrieve (default: 10, max: 50)
   """
+  try:
+    count_int = int(count)
+  except ValueError:
+    raise RuntimeError(f"Invalid argument (count)")  
   # Implementation here
   pass
 
@@ -191,18 +211,6 @@ async def follow_user(
   """
   # Implementation here
   pass
-
-@mcp.tool(description="Create a Twitter thread (a series of connected tweets)")
-async def create_thread(
-    tweets: list
-) -> str:
-    """
-    Args:
-      tweets: Array of tweet objects with 'text' (required) and optional 'media' array
-              Each media item should have 'data' (base64) and 'media_type' (MIME type)
-    """
-    # Implementation here
-    pass
 
 _auth_context: ContextVar[Optional['AuthContext']] = ContextVar('auth_context', default=None)
 

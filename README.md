@@ -12,7 +12,6 @@ Twitter client MCP Server where you only have to connect your account or auth to
 - `like_tweet` - Like or unlike a tweet
 - `retweet` - Retweet or undo retweet
 - `post_tweet` - Publish a new tweet, with optional media attachments
-- `create_thread` - Post a Twitter thread
 
 ### Timeline Tools
 - `get_timeline` - Fetch tweets from various timeline types
