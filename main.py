@@ -36,7 +36,9 @@ async def get_tweets(
   try:
     count_int = int(count)
   except ValueError:
-    raise RuntimeError(f"Invalid argument (count)")  
+    raise RuntimeError(f"Invalid argument (count)")
+  if count_int > 50 or count_int <= 0:
+    raise RuntimeError(f"Invalid argument (count)")
   pass
 
 @mcp.tool(description="Get a Twitter user's profile information")
@@ -65,7 +67,10 @@ async def search_tweets(
   try:
     count_int = int(count)
   except ValueError:
-    raise RuntimeError(f"Invalid argument (count)")  
+    raise RuntimeError(f"Invalid argument (count)")
+  if count_int > 50 or count_int <= 0:
+    raise RuntimeError(f"Invalid argument (count)")
+
   auth = get_auth_context()
   if auth is None:
     raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
@@ -153,6 +158,8 @@ async def get_user_relationships(
     count_int = int(count)
   except ValueError:
     raise RuntimeError(f"Invalid argument (count)")  
+  if count_int > 50 or count_int <= 0:
+    raise RuntimeError(f"Invalid argument (count)")
   # Implementation here
   pass
 
@@ -173,6 +180,8 @@ async def get_timeline(
     count_int = int(count)
   except ValueError:
     raise RuntimeError(f"Invalid argument (count)")  
+  if count_int > 50 or count_int <= 0:
+    raise RuntimeError(f"Invalid argument (count)")
   # Implementation here
   pass
 
@@ -190,7 +199,9 @@ async def get_list_tweets(
   try:
     count_int = int(count)
   except ValueError:
-    raise RuntimeError(f"Invalid argument (count)")  
+    raise RuntimeError(f"Invalid argument (count)")
+  if count_int > 50 or count_int <= 0:
+    raise RuntimeError(f"Invalid argument (count)")
   # Implementation here
   pass
 
