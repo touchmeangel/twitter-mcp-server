@@ -275,27 +275,6 @@ async def get_timeline(
     result.append({"id": tweet.id, "in_reply_to": tweet.in_reply_to, "author_username": tweet.user.screen_name, "text": tweet.text, "lang": tweet.lang, "created_at": tweet.created_at, "view_count": tweet.view_count, "favorite_count": tweet.favorite_count, "reply_count": tweet.reply_count, "retweet_count": tweet.retweet_count})
   return json.dumps(result)
 
-
-@mcp.tool(description="Get tweets from a Twitter list")
-async def get_list_tweets(
-  list_id: str,
-  count: str = "10"
-) -> str:
-  """
-  Args:
-    list_id: ID of the Twitter list to fetch tweets from
-    count: Number of tweets to retrieve (default: 10, max: 50)
-  """
-  try:
-    count_int = int(count)
-  except ValueError:
-    raise RuntimeError(f"Invalid argument (count)")
-  if count_int > 50 or count_int <= 0:
-    raise RuntimeError(f"Invalid argument (count)")
-  # Implementation here
-  pass
-
-
 @mcp.tool(description="Follow or unfollow a Twitter user")
 async def follow_user(
   username: str,
@@ -305,9 +284,23 @@ async def follow_user(
   Args:
     username: Username of the user to follow/unfollow (without @)
     action: Whether to follow or unfollow the user
-  """
-  # Implementation here
-  pass
+  """  
+  auth = get_auth_context()
+  if auth is None:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+
+  client = Client('en-US')
+  client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
+  try:
+    user = await client.get_user_by_screen_name(username)
+    if action == "follow":
+      await client.follow_user(user.id)
+    elif action == "unfollow":
+      await client.unfollow_user(user.id)
+  except errors.Forbidden:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+
+  return json.dumps({"status": "success"})
 
 _auth_context: ContextVar[Optional['AuthContext']] = ContextVar('auth_context', default=None)
 
