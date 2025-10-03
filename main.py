@@ -243,17 +243,14 @@ async def get_trends(
     result.append({"name": trend.name, "tweet_count": trend.tweets_count, "grouped_trends": trend.grouped_trends, "domain_context": trend.domain_context})
   return json.dumps(result)
 
-@mcp.tool(description="Get tweets from a user's timeline or home timeline")
+# TODO: add following timeline
+@mcp.tool(description="Get tweets from a user's personalized home timeline")
 async def get_timeline(
-  timeline_type: Literal["home", "following", "user"],
-  username: str = "",
-  count: str = "10"
+  count: str = "30"
 ) -> str:
   """
   Args:
-    timeline_type: Type of timeline - 'home' for personalized, 'following' for people you follow, or 'user' for specific user
-    username: Username of the user whose timeline to fetch (required only for timeline_type='user')
-    count: Number of tweets to retrieve (default: 10, max: 50)
+    count: Number of tweets to retrieve (default: 30, max: 50)
   """
   try:
     count_int = int(count)
@@ -261,8 +258,22 @@ async def get_timeline(
     raise RuntimeError(f"Invalid argument (count)")  
   if count_int > 50 or count_int <= 0:
     raise RuntimeError(f"Invalid argument (count)")
-  # Implementation here
-  pass
+  
+  auth = get_auth_context()
+  if auth is None:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+
+  client = Client('en-US')
+  client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
+  try:
+    tweets = await client.get_timeline(count=count_int)
+  except errors.Forbidden:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+  
+  result = []
+  for tweet in tweets:
+    result.append({"id": tweet.id, "in_reply_to": tweet.in_reply_to, "author_username": tweet.user.screen_name, "text": tweet.text, "lang": tweet.lang, "created_at": tweet.created_at, "view_count": tweet.view_count, "favorite_count": tweet.favorite_count, "reply_count": tweet.reply_count, "retweet_count": tweet.retweet_count})
+  return json.dumps(result)
 
 
 @mcp.tool(description="Get tweets from a Twitter list")
