@@ -18,7 +18,6 @@ Twitter client MCP Server where you only have to connect your account or auth to
 - `get_trends` - Retrieve currently trending topics
 
 ### User Management Tools
-- `get_user_relationships` - View a user's followers or accounts they follow
 - `follow_user` - Follow or unfollow another user
 
 ## Usage

@@ -243,28 +243,6 @@ async def get_trends(
     result.append({"name": trend.name, "tweet_count": trend.tweets_count, "grouped_trends": trend.grouped_trends, "domain_context": trend.domain_context})
   return json.dumps(result)
 
-@mcp.tool(description="Get a user's followers or following list")
-async def get_user_relationships(
-  username: str,
-  relationship_type: Literal["followers", "following"],
-  count: str = "10"
-) -> str:
-  """
-  Args:
-    username: Username of the user (without @)
-    relationship_type: Whether to get followers or following list
-    count: Number of profiles to retrieve (default: 10, max: 50)
-  """
-  try:
-    count_int = int(count)
-  except ValueError:
-    raise RuntimeError(f"Invalid argument (count)")  
-  if count_int > 50 or count_int <= 0:
-    raise RuntimeError(f"Invalid argument (count)")
-  # Implementation here
-  pass
-
-
 @mcp.tool(description="Get tweets from a user's timeline or home timeline")
 async def get_timeline(
   timeline_type: Literal["home", "following", "user"],
