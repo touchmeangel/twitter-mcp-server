@@ -210,11 +210,38 @@ async def post_tweet(
   return json.dumps({"status": "success"})
 
 @mcp.tool(description="Get current trending topics on Twitter")
-async def get_trends() -> str:
-  """Get current trending topics on Twitter"""
-  # Implementation here
-  pass
+async def get_trends(
+  category: Literal['trending', 'for-you', 'news', 'sports', 'entertainment'] = 'trending',
+  count: str = "30"
+) -> str:
+  """
+  Args:
+    category: Search mode - 'trending' for overall trends, 'for-you', 'news', 'sports', 'entertainment' for more specific trends
+    count: Number of trends to retrieve (default: 30, max: 50)
+  """
+  try:
+    count_int = int(count)
+  except ValueError:
+    raise RuntimeError(f"Invalid argument (count)")
+  if count_int > 50 or count_int <= 0:
+    raise RuntimeError(f"Invalid argument (count)")
+  
+  auth = get_auth_context()
+  if auth is None:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
 
+  client = Client('en-US')
+  client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
+
+  try:
+    trends = await client.get_trends(category, count=count_int, retry=False)
+  except errors.Forbidden:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+  
+  result = []
+  for trend in trends:
+    result.append({"name": trend.name, "tweet_count": trend.tweets_count, "grouped_trends": trend.grouped_trends, "domain_context": trend.domain_context})
+  return json.dumps(result)
 
 @mcp.tool(description="Get a user's followers or following list")
 async def get_user_relationships(
