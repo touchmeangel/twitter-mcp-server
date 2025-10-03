@@ -1,11 +1,10 @@
 import asyncio
 from mcp.server.fastmcp import FastMCP
-from typing import Any, Dict, List, Optional, Literal
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
-from starlette.middleware import Middleware
 from starlette.requests import Request
+from typing import Optional, Literal
 from contextvars import ContextVar
 from dataclasses import dataclass
 from twikit import Client, errors
@@ -27,7 +26,7 @@ mcp.streamable_http_app()
 @mcp.tool(description="Get recent tweets from a user")
 async def get_tweets(
   username: str,
-  count: Optional[int] = 10
+  count: int = 10
 ) -> str:
   """
   Args:
@@ -52,7 +51,7 @@ async def get_profile(
 async def search_tweets(
   query: str,
   mode: Literal["Latest", "Top"] = "Top",
-  count: Optional[int] = 30
+  count: int = 30
 ) -> str:
   """
   Args:
@@ -111,8 +110,8 @@ async def retweet(
 @mcp.tool(description="Post a new tweet, optionally with media or as a quote tweet")
 async def post_tweet(
   text: str,
-  reply_to_tweet_id: Optional[str] = None,
-  quote_tweet_id: Optional[str] = None,
+  reply_to_tweet_id: str = "",
+  quote_tweet_id: str = "",
   hide_link_preview: bool = False
 ) -> str:
   """
@@ -138,7 +137,7 @@ async def get_trends() -> str:
 async def get_user_relationships(
   username: str,
   relationship_type: Literal["followers", "following"],
-  count: Optional[int] = 10
+  count: int = 10
 ) -> str:
   """
   Args:
@@ -153,8 +152,8 @@ async def get_user_relationships(
 @mcp.tool(description="Get tweets from a user's timeline or home timeline")
 async def get_timeline(
   timeline_type: Literal["home", "following", "user"],
-  username: Optional[str] = None,
-  count: Optional[int] = 10
+  username: str = "",
+  count: int = 10
 ) -> str:
   """
   Args:
@@ -169,7 +168,7 @@ async def get_timeline(
 @mcp.tool(description="Get tweets from a Twitter list")
 async def get_list_tweets(
   list_id: str,
-  count: Optional[int] = 10
+  count: int = 10
 ) -> str:
   """
   Args:
