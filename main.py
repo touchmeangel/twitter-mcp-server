@@ -186,26 +186,28 @@ async def retweet(
 
   return json.dumps({"status": "success"})
 
-
 @mcp.tool(description="Post a new tweet, optionally with media or as a quote tweet")
 async def post_tweet(
   text: str,
   reply_to_tweet_id: str = "",
-  quote_tweet_id: str = "",
-  hide_link_preview: str = "false"
 ) -> str:
   """
   Args:
-    text: The text content of the tweet
+    text: The text content of the tweet limited to 280 characters
     reply_to_tweet_id: Optional ID of the tweet to reply to
-    quote_tweet_id: Optional ID of the tweet to quote
-    media: Optional array of media items with 'data' (base64) and 'media_type' (MIME type)
-    hide_link_preview: Whether to hide link previews in the tweet
   """
-  hide_link_preview_bool = hide_link_preview == "true"
-  # Implementation here
-  pass
+  auth = get_auth_context()
+  if auth is None:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
 
+  client = Client('en-US')
+  client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
+  try:
+    await client.create_tweet(text=text, reply_to=None if reply_to_tweet_id == "" else reply_to_tweet_id)
+  except errors.Forbidden:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+  
+  return json.dumps({"status": "success"})
 
 @mcp.tool(description="Get current trending topics on Twitter")
 async def get_trends() -> str:
