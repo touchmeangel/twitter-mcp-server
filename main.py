@@ -243,7 +243,7 @@ async def get_trends(
     result.append({"name": trend.name, "tweet_count": trend.tweets_count, "grouped_trends": trend.grouped_trends, "domain_context": trend.domain_context})
   return json.dumps(result)
 
-@mcp.tool(description="Get tweets from a user's personalized timeline")
+@mcp.tool(description="Get tweets from a user's home personalized timeline")
 async def get_timeline(
   category: Literal['for-you', 'following'] = 'for-you',
   count: str = "40"
