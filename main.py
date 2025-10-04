@@ -37,8 +37,10 @@ async def get_tweets(
     count_int = int(count)
   except ValueError:
     raise RuntimeError(f"Invalid argument (count)")
-  if count_int > 50 or count_int <= 0:
-    raise RuntimeError(f"Invalid argument (count)")
+  if count_int > 50:
+    raise RuntimeError(f"Invalid argument (count): max value is 50")
+  if count_int <= 0:
+    raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
   
   auth = get_auth_context()
   if auth is None:
@@ -113,8 +115,10 @@ async def search_tweets(
     count_int = int(count)
   except ValueError:
     raise RuntimeError(f"Invalid argument (count)")
-  if count_int > 50 or count_int <= 0:
-    raise RuntimeError(f"Invalid argument (count)")
+  if count_int > 50:
+    raise RuntimeError(f"Invalid argument (count): max value is 50")
+  if count_int <= 0:
+    raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
 
   auth = get_auth_context()
   if auth is None:
@@ -223,8 +227,10 @@ async def get_trends(
     count_int = int(count)
   except ValueError:
     raise RuntimeError(f"Invalid argument (count)")
-  if count_int > 50 or count_int <= 0:
-    raise RuntimeError(f"Invalid argument (count)")
+  if count_int > 50:
+    raise RuntimeError(f"Invalid argument (count): max value is 50")
+  if count_int <= 0:
+    raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
   
   auth = get_auth_context()
   if auth is None:
@@ -257,8 +263,10 @@ async def get_timeline(
     count_int = int(count)
   except ValueError:
     raise RuntimeError(f"Invalid argument (count)")  
-  if count_int > 50 or count_int <= 0:
-    raise RuntimeError(f"Invalid argument (count)")
+  if count_int > 50:
+    raise RuntimeError(f"Invalid argument (count): max value is 50")
+  if count_int <= 0:
+    raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
   
   auth = get_auth_context()
   if auth is None:
