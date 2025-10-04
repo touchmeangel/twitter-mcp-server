@@ -243,14 +243,15 @@ async def get_trends(
     result.append({"name": trend.name, "tweet_count": trend.tweets_count, "grouped_trends": trend.grouped_trends, "domain_context": trend.domain_context})
   return json.dumps(result)
 
-# TODO: add following timeline
-@mcp.tool(description="Get tweets from a user's personalized home timeline")
+@mcp.tool(description="Get tweets from a user's personalized timeline")
 async def get_timeline(
-  count: str = "30"
+  category: Literal['for-you', 'following'] = 'for-you',
+  count: str = "40"
 ) -> str:
   """
   Args:
-    count: Number of tweets to retrieve (default: 30, max: 50)
+    category: mode - 'for-you' for personalized home for-you feed, 'following' for your following timeline
+    count: Number of tweets to retrieve (default: 40, max: 50)
   """
   try:
     count_int = int(count)
@@ -266,7 +267,10 @@ async def get_timeline(
   client = Client('en-US')
   client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
   try:
-    tweets = await client.get_timeline(count=count_int)
+    if category == "for-you":
+      tweets = await client.get_timeline(count=count_int)
+    elif category == "following":
+      tweets = await client.get_latest_timeline(count=count_int)
   except errors.Forbidden:
     raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
   
