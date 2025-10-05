@@ -58,7 +58,7 @@ docker run -i --rm --name twitter-mcp-server -e APP_PORT=3000 -p 3000:3000 touch
 ```
 Authorization: Bearer <auth_token>:<ct0>
 ```
-<auth_token> and <ct0> are X (Twitter) cookies which allow access to your account.
+`auth_token` and `ct0` are X (Twitter) cookies which allow access to your account.
 
 ## Development & Testing
 Contributions are welcome! Please feel free to submit a Pull Request.
