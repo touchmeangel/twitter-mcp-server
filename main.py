@@ -108,7 +108,7 @@ async def search_tweets(
   """
   Args:
     query: Search query (hashtag or keyword). For hashtags, include the # symbol
-    mode: Search mode - 'latest' for most recent tweets or 'top' for most relevant tweets
+    mode: Search mode - 'latest' for most recent tweets or 'top' for most relevant tweets (default: 'top')
     count: Number of tweets to retrieve (default: 30, max: 50)
   """
   try:
