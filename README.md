@@ -53,7 +53,15 @@ Configuration:
 ```bash
 docker run -i --rm --name twitter-mcp-server -e APP_PORT=3000 -p 3000:3000 touchmeangel/twitter-mcp-server
 ```
-
+<b>You can even just run it inside docker compose</b>
+```docker-compose
+services:
+  twitter-mcp:
+    image: touchmeangel/twitter-mcp-server
+    restart: unless-stopped
+    environment:
+      - APP_PORT=3000
+```
 ## Authentication
 ```
 Authorization: Bearer <auth_token>:<ct0>
