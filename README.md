@@ -66,15 +66,7 @@ services:
 ```
 Authorization: Bearer <auth_token>:<ct0>
 ```
-<auth_token> and <ct0> are X (Twitter) cookies which allow access to your account.
-
-## Development & Testing
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-To test tools use
-```bash
-npx @modelcontextprotocol/inspector
-```
+`auth_token` and `ct0` are X (Twitter) cookies which allow access to your account.
 
 ## Error Handling
 
@@ -84,3 +76,11 @@ The server implements comprehensive error handling:
 - Detailed error messages
 - Proper error propagation
 - Logging for debugging
+
+## Development & Testing
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+To test tools use
+```bash
+npx @modelcontextprotocol/inspector
+```
