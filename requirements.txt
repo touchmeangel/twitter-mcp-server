@@ -27,8 +27,8 @@ sniffio==1.3.1
 sse-starlette==3.0.2
 starlette==0.48.0
 tqdm==4.67.1
-twikit==2.3.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 uvicorn==0.37.0
 websockets==15.0.1
+git+https://github.com/touchmeangel/twikit@main
