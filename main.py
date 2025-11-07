@@ -8,6 +8,7 @@ from typing import Optional, Literal
 from contextvars import ContextVar
 from dataclasses import dataclass
 from twikit import Client, errors
+import traceback
 import logging
 import uvicorn
 from config import HOST, PORT
@@ -316,23 +317,12 @@ async def follow_user(
 
 @mcp.tool(description="Read replies under post")
 async def get_replies(
-  tweet_id: str,
-  count: str = "30"
+  tweet_id: str
 ) -> str:
   """
   Args:
       tweet_id: ID of the tweet to get replies of
-      count: Number of replies to retrieve (default: 30, max: 50)
   """
-  try:
-    count_int = int(count)
-  except ValueError:
-    raise RuntimeError(f"Invalid argument (count)")  
-  if count_int > 50:
-    raise RuntimeError(f"Invalid argument (count): max value is 50")
-  if count_int <= 0:
-    raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
-  
   auth = get_auth_context()
   if auth is None:
     raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
@@ -340,9 +330,17 @@ async def get_replies(
   client = Client('en-US')
   client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
 
-  replies = await client._get_more_replies(tweet_id, None)
+  try:
+    tweet = await client.get_tweet_by_id(tweet_id)
+  except errors.Forbidden:
+    raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+  except Exception as e:
+    tb_str = traceback.format_exc()
+    logger.warning(f"err: {e} / {tb_str}")
+    raise
+
   result = []
-  for reply in replies:
+  for reply in tweet.replies or []:
     result.append({"id": reply.id, "in_reply_to": reply.in_reply_to, "author_username": reply.user.screen_name, "text": reply.text, "lang": reply.lang, "created_at": reply.created_at, "view_count": reply.view_count, "favorite_count": reply.favorite_count, "reply_count": reply.reply_count, "retweet_count": reply.retweet_count})
   return json.dumps(result)
 
