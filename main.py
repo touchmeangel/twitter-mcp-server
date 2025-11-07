@@ -314,6 +314,18 @@ async def follow_user(
 
   return json.dumps({"status": "success"})
 
+@mcp.tool(description="Read replies under post")
+async def get_replies(
+  tweet_id: str,
+  count: str = "30"
+) -> str:
+  """
+  Args:
+      tweet_id: ID of the tweet to get replies of
+      count: Number of replies to retrieve (default: 30, max: 50)
+  """
+  pass
+
 _auth_context: ContextVar[Optional['AuthContext']] = ContextVar('auth_context', default=None)
 
 @dataclass
