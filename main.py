@@ -334,10 +334,6 @@ async def get_replies(
     tweet = await client.get_tweet_by_id(tweet_id)
   except errors.Forbidden:
     raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
-  except Exception as e:
-    tb_str = traceback.format_exc()
-    logger.warning(f"err: {e} / {tb_str}")
-    raise
 
   result = []
   for reply in tweet.replies or []:
