@@ -61,7 +61,10 @@ services:
     restart: unless-stopped
     environment:
       - APP_PORT=3000
+    ports:
+      - 3000:3000
 ```
+Now use `http://twitter-mcp:3000/mcp` or `http://localhost:3000/mcp` for connection
 ## Authentication
 ```
 Authorization: Bearer <auth_token>:<ct0>
