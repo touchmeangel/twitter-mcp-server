@@ -13,7 +13,7 @@ import logging
 import uvicorn
 from config import HOST, PORT
 import json
-from hermes_tweet_client import HermesTweetClient, HermesTweetError
+from xquik_client import XquikClient, XquikError
 
 logger = logging.getLogger(__name__)
 
@@ -25,33 +25,33 @@ mcp = FastMCP(
 )
 mcp.streamable_http_app()
 
-async def try_hermes_tweet_read(method_name: str, *args) -> Optional[str]:
-  client = HermesTweetClient.from_env()
+async def try_xquik_read(method_name: str, *args) -> Optional[str]:
+  client = XquikClient.from_env()
   if not client.is_configured():
     return None
 
   try:
     method = getattr(client, method_name)
     result = await asyncio.to_thread(method, *args)
-  except HermesTweetError as exc:
+  except XquikError as exc:
     if get_auth_context() is None:
       raise RuntimeError(str(exc)) from exc
-    logger.warning("Hermes Tweet backend failed, falling back to cookie auth: %s", exc)
+    logger.warning("Xquik backend failed, falling back to cookie auth: %s", exc)
     return None
 
   return json.dumps(result)
 
-async def try_hermes_tweet_post(text: str, reply_to_tweet_id: str) -> Optional[str]:
-  client = HermesTweetClient.from_env()
+async def try_xquik_post(text: str, reply_to_tweet_id: str) -> Optional[str]:
+  client = XquikClient.from_env()
   if not client.can_create_tweets():
     return None
 
   try:
     result = await asyncio.to_thread(client.post_tweet, text, reply_to_tweet_id)
-  except HermesTweetError as exc:
+  except XquikError as exc:
     if get_auth_context() is None:
       raise RuntimeError(str(exc)) from exc
-    logger.warning("Hermes Tweet posting failed, falling back to cookie auth: %s", exc)
+    logger.warning("Xquik posting failed, falling back to cookie auth: %s", exc)
     return None
 
   return json.dumps(result)
@@ -75,9 +75,9 @@ async def get_tweets(
   if count_int <= 0:
     raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
 
-  hermes_result = await try_hermes_tweet_read("get_tweets", username, count_int)
-  if hermes_result is not None:
-    return hermes_result
+  xquik_result = await try_xquik_read("get_tweets", username, count_int)
+  if xquik_result is not None:
+    return xquik_result
 
   auth = get_auth_context()
   if auth is None:
@@ -104,9 +104,9 @@ async def get_profile(
   Args:
     username: Username of the user (without @)
   """
-  hermes_result = await try_hermes_tweet_read("get_profile", username)
-  if hermes_result is not None:
-    return hermes_result
+  xquik_result = await try_xquik_read("get_profile", username)
+  if xquik_result is not None:
+    return xquik_result
 
   auth = get_auth_context()
   if auth is None:
@@ -161,9 +161,9 @@ async def search_tweets(
   if count_int <= 0:
     raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
 
-  hermes_result = await try_hermes_tweet_read("search_tweets", query, mode, count_int)
-  if hermes_result is not None:
-    return hermes_result
+  xquik_result = await try_xquik_read("search_tweets", query, mode, count_int)
+  if xquik_result is not None:
+    return xquik_result
 
   auth = get_auth_context()
   if auth is None:
@@ -245,9 +245,9 @@ async def post_tweet(
     text: The text content of the tweet limited to 280 characters
     reply_to_tweet_id: Optional ID of the tweet to reply to
   """
-  hermes_result = await try_hermes_tweet_post(text, reply_to_tweet_id)
-  if hermes_result is not None:
-    return hermes_result
+  xquik_result = await try_xquik_post(text, reply_to_tweet_id)
+  if xquik_result is not None:
+    return xquik_result
 
   auth = get_auth_context()
   if auth is None:
@@ -371,9 +371,9 @@ async def get_replies(
   Args:
       tweet_id: ID of the tweet to get replies of
   """
-  hermes_result = await try_hermes_tweet_read("get_replies", tweet_id)
-  if hermes_result is not None:
-    return hermes_result
+  xquik_result = await try_xquik_read("get_replies", tweet_id)
+  if xquik_result is not None:
+    return xquik_result
 
   auth = get_auth_context()
   if auth is None:

@@ -71,9 +71,9 @@ Authorization: Bearer <auth_token>:<ct0>
 ```
 `auth_token` and `ct0` are X (Twitter) cookies which allow access to your account.
 
-### Optional Hermes Tweet Backend
+### Optional Xquik Backend
 
-Read tools can use [Hermes Tweet](https://github.com/Xquik-dev/hermes-tweet) through Xquik instead of bearer cookie auth when an API key is configured:
+Read tools can use [Xquik](https://xquik.com) instead of bearer cookie auth when an API key is configured:
 
 ```bash
 XQUIK_API_KEY=xq_...
@@ -81,13 +81,13 @@ XQUIK_API_KEY=xq_...
 XQUIK_BASE_URL=https://xquik.com
 ```
 
-`get_tweets`, `get_profile`, `search_tweets`, and `get_replies` use the Hermes Tweet backend automatically when `XQUIK_API_KEY` or `HERMES_TWEET_API_KEY` is present. If the backend is unavailable and a bearer cookie header is present, the server falls back to the existing Twikit path.
+`get_tweets`, `get_profile`, `search_tweets`, and `get_replies` use the Xquik backend automatically when `XQUIK_API_KEY` is present. If the backend is unavailable and a bearer cookie header is present, the server falls back to the existing Twikit path.
 
-Posting through Hermes Tweet is disabled by default. Enable it only for explicit write workflows:
+Posting through Xquik is disabled by default. Enable it only for explicit write workflows:
 
 ```bash
 XQUIK_ACCOUNT=@your_connected_account
-HERMES_TWEET_ENABLE_ACTIONS=true
+XQUIK_ENABLE_ACTIONS=true
 ```
 
 Without these write settings, `post_tweet` keeps using the existing cookie-authenticated Twikit path.

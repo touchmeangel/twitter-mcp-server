@@ -3,7 +3,7 @@ import unittest
 
 from urllib.error import HTTPError
 
-from hermes_tweet_client import HermesTweetClient, HermesTweetError
+from xquik_client import XquikClient, XquikError
 
 
 class FakeResponse:
@@ -33,7 +33,7 @@ class FakeOpener:
     return FakeResponse(self.payload)
 
 
-class HermesTweetClientTest(unittest.TestCase):
+class XquikClientTest(unittest.TestCase):
   def test_search_tweets_builds_query_and_normalizes_results(self):
     opener = FakeOpener(
       {
@@ -48,7 +48,7 @@ class HermesTweetClientTest(unittest.TestCase):
         ]
       }
     )
-    client = HermesTweetClient(api_key="xq_test", opener=opener)
+    client = XquikClient(api_key="xq_test", opener=opener)
 
     result = client.search_tweets("ai agents", "Latest", 5)
 
@@ -72,7 +72,7 @@ class HermesTweetClientTest(unittest.TestCase):
         }
       }
     )
-    client = HermesTweetClient(api_key="plain-token", opener=opener)
+    client = XquikClient(api_key="plain-token", opener=opener)
 
     result = client.get_profile("@alice")
 
@@ -97,7 +97,7 @@ class HermesTweetClientTest(unittest.TestCase):
         }
       }
     )
-    client = HermesTweetClient(api_key="xq_test", opener=opener)
+    client = XquikClient(api_key="xq_test", opener=opener)
 
     result = client.get_tweets("bob", 2)
 
@@ -108,14 +108,14 @@ class HermesTweetClientTest(unittest.TestCase):
     self.assertEqual(result[0]["reply_count"], 1)
 
   def test_post_tweet_requires_action_configuration(self):
-    client = HermesTweetClient(api_key="xq_test")
+    client = XquikClient(api_key="xq_test")
 
-    with self.assertRaises(HermesTweetError):
+    with self.assertRaises(XquikError):
       client.post_tweet("hello")
 
   def test_post_tweet_sends_account_and_reply(self):
     opener = FakeOpener({"tweet": {"id": "99"}})
-    client = HermesTweetClient(
+    client = XquikClient(
       api_key="xq_test",
       account="@alice",
       actions_enabled=True,
@@ -139,9 +139,9 @@ class HermesTweetClientTest(unittest.TestCase):
       def __call__(self, request, timeout):
         raise HTTPError(request.full_url, 402, "Payment Required", {}, FakeResponse({"error": "insufficient_credits"}))
 
-    client = HermesTweetClient(api_key="xq_test", opener=ErrorOpener())
+    client = XquikClient(api_key="xq_test", opener=ErrorOpener())
 
-    with self.assertRaisesRegex(HermesTweetError, "insufficient_credits"):
+    with self.assertRaisesRegex(XquikError, "insufficient_credits"):
       client.search_tweets("ai", "Top", 1)
 
 

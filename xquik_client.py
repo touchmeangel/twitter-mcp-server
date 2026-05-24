@@ -12,11 +12,11 @@ DEFAULT_BASE_URL = "https://xquik.com"
 DEFAULT_TIMEOUT = 30
 
 
-class HermesTweetError(RuntimeError):
-  """Raised when the optional Hermes Tweet backend cannot complete a request."""
+class XquikError(RuntimeError):
+  """Raised when the optional Xquik backend cannot complete a request."""
 
 
-class HermesTweetClient:
+class XquikClient:
   def __init__(
     self,
     api_key: str,
@@ -34,12 +34,12 @@ class HermesTweetClient:
     self.opener = opener
 
   @classmethod
-  def from_env(cls, env: Mapping[str, str] | None = None) -> "HermesTweetClient":
+  def from_env(cls, env: Mapping[str, str] | None = None) -> "XquikClient":
     source = env if env is not None else os.environ
-    api_key = source.get("XQUIK_API_KEY") or source.get("HERMES_TWEET_API_KEY") or ""
+    api_key = source.get("XQUIK_API_KEY") or ""
     base_url = source.get("XQUIK_BASE_URL") or DEFAULT_BASE_URL
-    account = source.get("XQUIK_ACCOUNT") or source.get("HERMES_TWEET_ACCOUNT") or ""
-    actions_enabled = source.get("HERMES_TWEET_ENABLE_ACTIONS", "").lower() in {"1", "true", "yes"}
+    account = source.get("XQUIK_ACCOUNT") or ""
+    actions_enabled = source.get("XQUIK_ENABLE_ACTIONS", "").lower() in {"1", "true", "yes"}
     return cls(api_key=api_key, base_url=base_url, account=account, actions_enabled=actions_enabled)
 
   def is_configured(self) -> bool:
@@ -75,8 +75,8 @@ class HermesTweetClient:
 
   def post_tweet(self, text: str, reply_to_tweet_id: str = "") -> dict[str, Any]:
     if not self.can_create_tweets():
-      raise HermesTweetError(
-        "Hermes Tweet posting requires XQUIK_API_KEY, XQUIK_ACCOUNT, and HERMES_TWEET_ENABLE_ACTIONS=true."
+      raise XquikError(
+        "Xquik posting requires XQUIK_API_KEY, XQUIK_ACCOUNT, and XQUIK_ENABLE_ACTIONS=true."
       )
 
     body: dict[str, Any] = {"account": self.account, "text": text}
@@ -96,7 +96,7 @@ class HermesTweetClient:
     body: Mapping[str, Any] | None = None,
   ) -> Any:
     if not self.api_key:
-      raise HermesTweetError("Hermes Tweet backend is not configured.")
+      raise XquikError("Xquik backend is not configured.")
 
     query_string = urlencode({key: value for key, value in (query or {}).items() if value is not None})
     url = f"{self.base_url}{path}"
@@ -114,9 +114,9 @@ class HermesTweetClient:
         return self._decode_json(response.read())
     except HTTPError as exc:
       detail = self._error_detail(exc)
-      raise HermesTweetError(f"Hermes Tweet request failed with HTTP {exc.code}: {detail}") from exc
+      raise XquikError(f"Xquik request failed with HTTP {exc.code}: {detail}") from exc
     except URLError as exc:
-      raise HermesTweetError(f"Hermes Tweet request failed: {exc.reason}") from exc
+      raise XquikError(f"Xquik request failed: {exc.reason}") from exc
 
   def _headers(self, has_body: bool) -> dict[str, str]:
     headers: dict[str, str] = {}
