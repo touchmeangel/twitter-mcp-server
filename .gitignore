@@ -118,3 +118,4 @@ config.json
 
 sessions
 *.bat
+junit.xml

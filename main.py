@@ -1,18 +1,19 @@
 import asyncio
+import json
+import logging
+from contextvars import ContextVar
+from dataclasses import dataclass
+from typing import Literal, Optional
+
+import uvicorn
 from mcp.server.fastmcp import FastMCP
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
-from starlette.responses import JSONResponse
 from starlette.requests import Request
-from typing import Optional, Literal
-from contextvars import ContextVar
-from dataclasses import dataclass
+from starlette.responses import JSONResponse
 from twikit import Client, errors
-import traceback
-import logging
-import uvicorn
+
 from config import HOST, PORT
-import json
 from xquik_client import XquikClient, XquikError
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ mcp = FastMCP(
 mcp.streamable_http_app()
 
 
-async def try_xquik_read(method_name: str, *args) -> Optional[str]:
+async def try_xquik_read(method_name: str, *args) -> str | None:
     client = XquikClient.from_env()
     if not client.is_configured():
         return None
@@ -43,7 +44,7 @@ async def try_xquik_read(method_name: str, *args) -> Optional[str]:
     return json.dumps(result)
 
 
-async def try_xquik_post(text: str, reply_to_tweet_id: str) -> Optional[str]:
+async def try_xquik_post(text: str, reply_to_tweet_id: str) -> str | None:
     client = XquikClient.from_env()
     if not client.can_create_tweets():
         return None
@@ -69,11 +70,11 @@ async def get_tweets(username: str, count: str = "30") -> str:
     try:
         count_int = int(count)
     except ValueError:
-        raise RuntimeError(f"Invalid argument (count)")
+        raise RuntimeError("Invalid argument (count)") from None
     if count_int > 50:
-        raise RuntimeError(f"Invalid argument (count): max value is 50")
+        raise RuntimeError("Invalid argument (count): max value is 50")
     if count_int <= 0:
-        raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
+        raise RuntimeError("Invalid argument (count): count cant be less then 0")
 
     xquik_result = await try_xquik_read("get_tweets", username, count_int)
     if xquik_result is not None:
@@ -81,7 +82,7 @@ async def get_tweets(username: str, count: str = "30") -> str:
 
     auth = get_auth_context()
     if auth is None:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
     client = Client("en-US")
     client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
@@ -89,7 +90,7 @@ async def get_tweets(username: str, count: str = "30") -> str:
         user = await client.get_user_by_screen_name(username)
         tweets = await client.get_user_tweets(user.id, "Tweets", count=count_int)
     except errors.Forbidden:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED") from None
 
     result = []
     for tweet in tweets:
@@ -122,7 +123,7 @@ async def get_profile(username: str) -> str:
 
     auth = get_auth_context()
     if auth is None:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
     client = Client("en-US")
     client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
@@ -130,7 +131,7 @@ async def get_profile(username: str) -> str:
     try:
         user = await client.get_user_by_screen_name(username)
     except errors.Forbidden:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED") from None
 
     return json.dumps(
         {
@@ -168,11 +169,11 @@ async def search_tweets(
     try:
         count_int = int(count)
     except ValueError:
-        raise RuntimeError(f"Invalid argument (count)")
+        raise RuntimeError("Invalid argument (count)") from None
     if count_int > 50:
-        raise RuntimeError(f"Invalid argument (count): max value is 50")
+        raise RuntimeError("Invalid argument (count): max value is 50")
     if count_int <= 0:
-        raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
+        raise RuntimeError("Invalid argument (count): count cant be less then 0")
 
     xquik_result = await try_xquik_read("search_tweets", query, mode, count_int)
     if xquik_result is not None:
@@ -180,14 +181,14 @@ async def search_tweets(
 
     auth = get_auth_context()
     if auth is None:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
     client = Client("en-US")
     client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
     try:
         tweets = await client.search_tweet(query, mode, count=count_int)
     except errors.Forbidden:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED") from None
 
     result = []
     for tweet in tweets:
@@ -217,7 +218,7 @@ async def like_tweet(tweet_id: str, action: Literal["like", "unlike"] = "like") 
     """
     auth = get_auth_context()
     if auth is None:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
     client = Client("en-US")
     client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
@@ -228,7 +229,7 @@ async def like_tweet(tweet_id: str, action: Literal["like", "unlike"] = "like") 
         elif action == "unlike":
             await client.unfavorite_tweet(tweet_id)
     except errors.Forbidden:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED") from None
 
     return json.dumps({"status": "success"})
 
@@ -242,7 +243,7 @@ async def retweet(tweet_id: str, action: Literal["retweet", "undo"] = "retweet")
     """
     auth = get_auth_context()
     if auth is None:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
     client = Client("en-US")
     client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
@@ -253,7 +254,7 @@ async def retweet(tweet_id: str, action: Literal["retweet", "undo"] = "retweet")
         elif action == "undo":
             await client.delete_retweet(tweet_id)
     except errors.Forbidden:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED") from None
 
     return json.dumps({"status": "success"})
 
@@ -274,7 +275,7 @@ async def post_tweet(
 
     auth = get_auth_context()
     if auth is None:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
     client = Client("en-US")
     client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
@@ -283,7 +284,7 @@ async def post_tweet(
             text=text, reply_to=None if reply_to_tweet_id == "" else reply_to_tweet_id
         )
     except errors.Forbidden:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED") from None
 
     return json.dumps({"status": "success"})
 
@@ -303,15 +304,15 @@ async def get_trends(
     try:
         count_int = int(count)
     except ValueError:
-        raise RuntimeError(f"Invalid argument (count)")
+        raise RuntimeError("Invalid argument (count)") from None
     if count_int > 50:
-        raise RuntimeError(f"Invalid argument (count): max value is 50")
+        raise RuntimeError("Invalid argument (count): max value is 50")
     if count_int <= 0:
-        raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
+        raise RuntimeError("Invalid argument (count): count cant be less then 0")
 
     auth = get_auth_context()
     if auth is None:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
     client = Client("en-US")
     client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
@@ -319,7 +320,7 @@ async def get_trends(
     try:
         trends = await client.get_trends(category, count=count_int, retry=False)
     except errors.Forbidden:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED") from None
 
     result = []
     for trend in trends:
@@ -346,15 +347,15 @@ async def get_timeline(
     try:
         count_int = int(count)
     except ValueError:
-        raise RuntimeError(f"Invalid argument (count)")
+        raise RuntimeError("Invalid argument (count)") from None
     if count_int > 50:
-        raise RuntimeError(f"Invalid argument (count): max value is 50")
+        raise RuntimeError("Invalid argument (count): max value is 50")
     if count_int <= 0:
-        raise RuntimeError(f"Invalid argument (count): count cant be less then 0")
+        raise RuntimeError("Invalid argument (count): count cant be less then 0")
 
     auth = get_auth_context()
     if auth is None:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
     client = Client("en-US")
     client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
@@ -364,7 +365,7 @@ async def get_timeline(
         elif category == "following":
             tweets = await client.get_latest_timeline(count=count_int)
     except errors.Forbidden:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED") from None
 
     result = []
     for tweet in tweets:
@@ -396,7 +397,7 @@ async def follow_user(
     """
     auth = get_auth_context()
     if auth is None:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
     client = Client("en-US")
     client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
@@ -407,7 +408,7 @@ async def follow_user(
         elif action == "unfollow":
             await client.unfollow_user(user.id)
     except errors.Forbidden:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED") from None
 
     return json.dumps({"status": "success"})
 
@@ -424,7 +425,7 @@ async def get_replies(tweet_id: str) -> str:
 
     auth = get_auth_context()
     if auth is None:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
     client = Client("en-US")
     client.set_cookies({"auth_token": auth.auth_token, "ct0": auth.ct0})
@@ -432,7 +433,7 @@ async def get_replies(tweet_id: str) -> str:
     try:
         tweet = await client.get_tweet_by_id(tweet_id)
     except errors.Forbidden:
-        raise RuntimeError(f"Authentication required: AUTH_REQUIRED")
+        raise RuntimeError("Authentication required: AUTH_REQUIRED") from None
 
     result = []
     for reply in tweet.replies or []:
@@ -464,12 +465,12 @@ class AuthContext:
     ct0: str
 
 
-def set_auth_context(auth: Optional[AuthContext]) -> None:
+def set_auth_context(auth: AuthContext | None) -> None:
     """Set the authentication context for the current async context."""
     _auth_context.set(auth)
 
 
-def get_auth_context() -> Optional[AuthContext]:
+def get_auth_context() -> AuthContext | None:
     """Get the authentication context from the current async context."""
     return _auth_context.get()
 
