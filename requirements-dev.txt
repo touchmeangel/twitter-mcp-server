@@ -5,4 +5,4 @@ pytest-mock>=3.12.0
 ruff>=0.3.0
 bandit[toml]>=1.7.0
 mypy>=1.8.0
-stypes-requests
+types-requests
