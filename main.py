@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP(
     name="twitter-mcp-server",
     host=HOST,
-    port=int(PORT or "8080"),
+    port=int(PORT),
     streamable_http_path="/mcp",
 )
 mcp.streamable_http_app()
