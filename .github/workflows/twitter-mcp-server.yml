@@ -35,10 +35,16 @@ jobs:
         run: mypy . --ignore-missing-imports || true
 
       - name: Run Tests with Coverage
-        run: pytest --cov --cov-branch --cov-report=xml
+        run: pytest --cov --junitxml=junit.xml
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
