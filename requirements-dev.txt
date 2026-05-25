@@ -1,14 +1,8 @@
-# Testing
 pytest>=8.0.0
 pytest-cov>=4.1.0
 pytest-asyncio>=0.23.0
-
-# Linting & Formatting
+pytest-mock>=3.12.0
 ruff>=0.3.0
-
-# Static Analysis
 bandit[toml]>=1.7.0
 mypy>=1.8.0
-
-# Type stubs (if using common libraries)
-types-requests
+stypes-requests
