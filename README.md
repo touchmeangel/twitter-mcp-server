@@ -71,6 +71,27 @@ Authorization: Bearer <auth_token>:<ct0>
 ```
 `auth_token` and `ct0` are X (Twitter) cookies which allow access to your account.
 
+### Optional GetXAPI Backend
+
+Read tools can use [GetXAPI](https://getxapi.com) instead of bearer cookie auth when an API key is configured:
+
+```bash
+GETXAPI_API_KEY=...
+# Optional. Defaults to https://api.getxapi.com.
+GETXAPI_BASE_URL=https://api.getxapi.com
+```
+
+`get_tweets`, `get_profile`, `search_tweets`, and `get_replies` use the GetXAPI backend automatically when `GETXAPI_API_KEY` is present. If the backend is unavailable and a bearer cookie header is present, the server falls back to the existing Twikit path.
+
+Posting through GetXAPI is disabled by default. Enable it only for explicit write workflows:
+
+```bash
+GETXAPI_ACCOUNT=@your_connected_account
+GETXAPI_ENABLE_ACTIONS=true
+```
+
+Without these write settings, `post_tweet` keeps using the existing cookie-authenticated Twikit path.
+
 ## Error Handling
 
 The server implements comprehensive error handling:

@@ -14,6 +14,7 @@ from starlette.responses import JSONResponse
 from twikit import Client, errors
 
 from config import HOST, PORT
+from getxapi_client import GetXAPIClient, GetXAPIError
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,39 @@ mcp = FastMCP(
     streamable_http_path="/mcp",
 )
 mcp.streamable_http_app()
+
+
+async def try_getxapi_read(method_name: str, *args) -> str | None:
+    client = GetXAPIClient.from_env()
+    if not client.is_configured():
+        return None
+
+    try:
+        method = getattr(client, method_name)
+        result = await asyncio.to_thread(method, *args)
+    except GetXAPIError as exc:
+        if get_auth_context() is None:
+            raise RuntimeError(str(exc)) from exc
+        logger.warning("GetXAPI backend failed, falling back to cookie auth: %s", exc)
+        return None
+
+    return json.dumps(result)
+
+
+async def try_getxapi_post(text: str, reply_to_tweet_id: str) -> str | None:
+    client = GetXAPIClient.from_env()
+    if not client.can_create_tweets():
+        return None
+
+    try:
+        result = await asyncio.to_thread(client.post_tweet, text, reply_to_tweet_id)
+    except GetXAPIError as exc:
+        if get_auth_context() is None:
+            raise RuntimeError(str(exc)) from exc
+        logger.warning("GetXAPI posting failed, falling back to cookie auth: %s", exc)
+        return None
+
+    return json.dumps(result)
 
 
 @mcp.tool(description="Get recent tweets from a user")
@@ -41,6 +75,10 @@ async def get_tweets(username: str, count: str = "30") -> str:
         raise RuntimeError("Invalid argument (count): max value is 50")
     if count_int <= 0:
         raise RuntimeError("Invalid argument (count): count cant be less then 0")
+
+    getxapi_result = await try_getxapi_read("get_tweets", username, count_int)
+    if getxapi_result is not None:
+        return getxapi_result
 
     auth = get_auth_context()
     if auth is None:
@@ -79,6 +117,10 @@ async def get_profile(username: str) -> str:
     Args:
       username: Username of the user (without @)
     """
+    getxapi_result = await try_getxapi_read("get_profile", username)
+    if getxapi_result is not None:
+        return getxapi_result
+
     auth = get_auth_context()
     if auth is None:
         raise RuntimeError("Authentication required: AUTH_REQUIRED")
@@ -132,6 +174,10 @@ async def search_tweets(
         raise RuntimeError("Invalid argument (count): max value is 50")
     if count_int <= 0:
         raise RuntimeError("Invalid argument (count): count cant be less then 0")
+
+    getxapi_result = await try_getxapi_read("search_tweets", query, mode, count_int)
+    if getxapi_result is not None:
+        return getxapi_result
 
     auth = get_auth_context()
     if auth is None:
@@ -223,6 +269,10 @@ async def post_tweet(
       text: The text content of the tweet limited to 280 characters
       reply_to_tweet_id: Optional ID of the tweet to reply to
     """
+    getxapi_result = await try_getxapi_post(text, reply_to_tweet_id)
+    if getxapi_result is not None:
+        return getxapi_result
+
     auth = get_auth_context()
     if auth is None:
         raise RuntimeError("Authentication required: AUTH_REQUIRED")
@@ -369,6 +419,10 @@ async def get_replies(tweet_id: str) -> str:
     Args:
         tweet_id: ID of the tweet to get replies of
     """
+    getxapi_result = await try_getxapi_read("get_replies", tweet_id)
+    if getxapi_result is not None:
+        return getxapi_result
+
     auth = get_auth_context()
     if auth is None:
         raise RuntimeError("Authentication required: AUTH_REQUIRED")
