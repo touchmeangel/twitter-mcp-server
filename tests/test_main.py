@@ -166,9 +166,21 @@ async def test_search_tweets_with_xquik_backend(mock_client_class, monkeypatch):
     ]
     mock_client.get.assert_awaited_once_with(
         "https://example.test/api/v1/x/tweets/search",
-        params={"q": "AI agents", "limit": 2},
+        params={"q": "AI agents", "queryType": "Top", "limit": 2},
         headers={"x-api-key": "xq_test"},
     )
+
+
+@pytest.mark.asyncio
+async def test_search_tweets_with_xquik_backend_requires_key(monkeypatch):
+    """Test forced Hermes Tweet backend reports both key names."""
+    set_auth_context(None)
+    monkeypatch.delenv("HERMES_TWEET_API_KEY", raising=False)
+    monkeypatch.delenv("XQUIK_API_KEY", raising=False)
+    monkeypatch.setenv("X_READ_BACKEND", "hermes")
+
+    with pytest.raises(RuntimeError, match="HERMES_TWEET_API_KEY or XQUIK_API_KEY"):
+        await search_tweets("AI agents", count="2")
 
 
 # ============================================================================

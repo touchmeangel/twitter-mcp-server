@@ -116,17 +116,19 @@ def normalize_xquik_tweet(tweet: Any) -> dict[str, Any]:
     }
 
 
-async def search_tweets_with_xquik(query: str, count: int) -> str:
+async def search_tweets_with_xquik(query: str, mode: str, count: int) -> str:
     api_key = get_xquik_api_key()
     if api_key is None:
-        raise RuntimeError("Hermes Tweet API key required: HERMES_TWEET_API_KEY")
+        raise RuntimeError(
+            "Hermes Tweet API key required: HERMES_TWEET_API_KEY or XQUIK_API_KEY"
+        )
 
     url = f"{get_xquik_base_url()}{XQUIK_SEARCH_PATH}"
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.get(
                 url,
-                params={"q": query, "limit": count},
+                params={"q": query, "queryType": mode, "limit": count},
                 headers=xquik_auth_headers(api_key),
             )
             response.raise_for_status()
@@ -248,7 +250,7 @@ async def search_tweets(
 
     auth = get_auth_context()
     if should_use_xquik_search(auth):
-        return await search_tweets_with_xquik(query, count_int)
+        return await search_tweets_with_xquik(query, mode, count_int)
     if auth is None:
         raise RuntimeError("Authentication required: AUTH_REQUIRED")
 
