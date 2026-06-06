@@ -34,7 +34,7 @@ async def try_xquik_read(method_name: str, *args) -> str | None:
 
     try:
         method = getattr(client, method_name)
-        result = await asyncio.to_thread(method, *args)
+        result = await method(*args)
     except XquikError as exc:
         if get_auth_context() is None:
             raise RuntimeError(str(exc)) from exc
@@ -50,7 +50,7 @@ async def try_xquik_post(text: str, reply_to_tweet_id: str) -> str | None:
         return None
 
     try:
-        result = await asyncio.to_thread(client.post_tweet, text, reply_to_tweet_id)
+        result = await client.post_tweet(text, reply_to_tweet_id)
     except XquikError as exc:
         if get_auth_context() is None:
             raise RuntimeError(str(exc)) from exc

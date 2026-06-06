@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Mapping
-from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
-from urllib.request import Request, urlopen
+from collections.abc import Mapping
+from typing import Any
+from urllib.parse import quote, urlencode, urlparse
 
+import aiohttp
 
 DEFAULT_BASE_URL = "https://xquik.com"
 DEFAULT_TIMEOUT = 30
@@ -24,17 +24,20 @@ class XquikClient:
         account: str = "",
         actions_enabled: bool = False,
         timeout: int = DEFAULT_TIMEOUT,
-        opener: Any = urlopen,
+        session: aiohttp.ClientSession | None = None,
     ) -> None:
         self.api_key = api_key.strip()
         self.base_url = base_url.rstrip("/")
+        parsed = urlparse(self.base_url)
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("XQUIK_BASE_URL must use http or https")
         self.account = account.strip()
         self.actions_enabled = actions_enabled
         self.timeout = timeout
-        self.opener = opener
+        self.session = session
 
     @classmethod
-    def from_env(cls, env: Mapping[str, str] | None = None) -> "XquikClient":
+    def from_env(cls, env: Mapping[str, str] | None = None) -> XquikClient:
         source = env if env is not None else os.environ
         api_key = source.get("XQUIK_API_KEY") or ""
         base_url = source.get("XQUIK_BASE_URL") or DEFAULT_BASE_URL
@@ -57,8 +60,8 @@ class XquikClient:
     def can_create_tweets(self) -> bool:
         return self.is_configured() and self.actions_enabled and bool(self.account)
 
-    def get_tweets(self, username: str, count: int) -> list[dict[str, Any]]:
-        payload = self._request_json(
+    async def get_tweets(self, username: str, count: int) -> list[dict[str, Any]]:
+        payload = await self._request_json(
             "GET",
             f"/api/v1/x/users/{quote(username.lstrip('@'))}/tweets",
             query={"limit": count},
@@ -68,15 +71,17 @@ class XquikClient:
             for tweet in self._extract_items(payload, "tweets")
         ]
 
-    def get_profile(self, username: str) -> dict[str, Any]:
-        payload = self._request_json(
+    async def get_profile(self, username: str) -> dict[str, Any]:
+        payload = await self._request_json(
             "GET", f"/api/v1/x/users/{quote(username.lstrip('@'))}"
         )
         profile = self._extract_object(payload, "profile", "user")
         return self._normalize_profile(profile)
 
-    def search_tweets(self, query: str, mode: str, count: int) -> list[dict[str, Any]]:
-        payload = self._request_json(
+    async def search_tweets(
+        self, query: str, mode: str, count: int
+    ) -> list[dict[str, Any]]:
+        payload = await self._request_json(
             "GET",
             "/api/v1/x/tweets/search",
             query={"q": query, "queryType": mode, "limit": count},
@@ -86,8 +91,8 @@ class XquikClient:
             for tweet in self._extract_items(payload, "tweets")
         ]
 
-    def get_replies(self, tweet_id: str) -> list[dict[str, Any]]:
-        payload = self._request_json(
+    async def get_replies(self, tweet_id: str) -> list[dict[str, Any]]:
+        payload = await self._request_json(
             "GET", f"/api/v1/x/tweets/{quote(tweet_id)}/replies"
         )
         return [
@@ -95,7 +100,9 @@ class XquikClient:
             for tweet in self._extract_items(payload, "replies", "tweets")
         ]
 
-    def post_tweet(self, text: str, reply_to_tweet_id: str = "") -> dict[str, Any]:
+    async def post_tweet(
+        self, text: str, reply_to_tweet_id: str = ""
+    ) -> dict[str, Any]:
         if not self.can_create_tweets():
             raise XquikError(
                 "Xquik posting requires XQUIK_API_KEY, XQUIK_ACCOUNT, and XQUIK_ENABLE_ACTIONS=true."
@@ -105,16 +112,18 @@ class XquikClient:
         if reply_to_tweet_id:
             body["replyToTweetId"] = reply_to_tweet_id
 
-        payload = self._request_json("POST", "/api/v1/x/tweets", body=body)
+        payload = await self._request_json("POST", "/api/v1/x/tweets", body=body)
         tweet = self._extract_object(payload, "tweet", "data")
         tweet_id = (
             tweet.get("id") or tweet.get("tweetId") or payload.get("id")
             if isinstance(payload, dict)
             else None
         )
+        if not tweet_id:
+            raise XquikError("Xquik post_tweet response missing tweet id.")
         return {"status": "success", "tweet_id": tweet_id, "data": payload}
 
-    def _request_json(
+    async def _request_json(
         self,
         method: str,
         path: str,
@@ -131,22 +140,29 @@ class XquikClient:
         if query_string:
             url = f"{url}?{query_string}"
 
-        request_body = None
         headers = self._headers(has_body=body is not None)
-        if body is not None:
-            request_body = json.dumps(body).encode("utf-8")
 
-        request = Request(url, data=request_body, headers=headers, method=method)
+        timeout = aiohttp.ClientTimeout(total=self.timeout)
         try:
-            with self.opener(request, timeout=self.timeout) as response:
-                return self._decode_json(response.read())
-        except HTTPError as exc:
-            detail = self._error_detail(exc)
-            raise XquikError(
-                f"Xquik request failed with HTTP {exc.code}: {detail}"
-            ) from exc
-        except URLError as exc:
-            raise XquikError(f"Xquik request failed: {exc.reason}") from exc
+            if self.session is not None:
+                async with self.session.request(
+                    method,
+                    url,
+                    headers=headers,
+                    json=body,
+                    timeout=timeout,
+                ) as response:
+                    return await self._decode_response(response)
+
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.request(
+                    method, url, headers=headers, json=body
+                ) as response:
+                    return await self._decode_response(response)
+        except TimeoutError as exc:
+            raise XquikError("Xquik request timed out.") from exc
+        except aiohttp.ClientError as exc:
+            raise XquikError(f"Xquik request failed: {exc}") from exc
 
     def _headers(self, has_body: bool) -> dict[str, str]:
         headers: dict[str, str] = {}
@@ -158,11 +174,20 @@ class XquikClient:
             headers["content-type"] = "application/json"
         return headers
 
-    def _error_detail(self, exc: HTTPError) -> str:
+    async def _decode_response(self, response: aiohttp.ClientResponse) -> Any:
+        raw = await response.read()
+        if response.status >= 400:
+            detail = self._error_detail(raw, response.reason)
+            raise XquikError(
+                f"Xquik request failed with HTTP {response.status}: {detail}"
+            )
+        return self._decode_json(raw)
+
+    def _error_detail(self, raw: bytes, reason: str | None) -> str:
         try:
-            payload = self._decode_json(exc.read())
+            payload = self._decode_json(raw)
         except (ValueError, OSError):
-            return exc.reason or "request failed"
+            return reason or "request failed"
         if isinstance(payload, dict):
             return str(payload.get("error") or payload.get("message") or payload)
         return str(payload)
@@ -200,6 +225,12 @@ class XquikClient:
             return data
         return payload
 
+    def _first_present(self, obj: Mapping[str, Any], *keys: str) -> Any:
+        for key in keys:
+            if key in obj and obj[key] is not None:
+                return obj[key]
+        return None
+
     def _normalize_tweet(self, tweet: Any) -> dict[str, Any]:
         if not isinstance(tweet, dict):
             return {}
@@ -207,28 +238,26 @@ class XquikClient:
         user = tweet.get("user") if isinstance(tweet.get("user"), dict) else {}
         author = tweet.get("author") if isinstance(tweet.get("author"), dict) else {}
         return {
-            "id": tweet.get("id")
-            or tweet.get("id_str")
-            or tweet.get("tweetId")
-            or tweet.get("tweet_id"),
-            "in_reply_to": tweet.get("in_reply_to") or tweet.get("inReplyToTweetId"),
-            "author_username": (
-                tweet.get("author_username")
-                or tweet.get("username")
-                or user.get("screen_name")
-                or user.get("username")
-                or author.get("username")
-                or author.get("screen_name")
+            "id": self._first_present(tweet, "id", "id_str", "tweetId", "tweet_id"),
+            "in_reply_to": self._first_present(
+                tweet, "in_reply_to", "inReplyToTweetId"
             ),
-            "text": tweet.get("text") or tweet.get("full_text") or tweet.get("content"),
-            "lang": tweet.get("lang"),
-            "created_at": tweet.get("created_at") or tweet.get("createdAt"),
-            "view_count": tweet.get("view_count") or tweet.get("viewCount"),
-            "favorite_count": tweet.get("favorite_count")
-            or tweet.get("like_count")
-            or tweet.get("favoriteCount"),
-            "reply_count": tweet.get("reply_count") or tweet.get("replyCount"),
-            "retweet_count": tweet.get("retweet_count") or tweet.get("retweetCount"),
+            "author_username": (
+                self._first_present(tweet, "author_username", "username")
+                or self._first_present(user, "screen_name", "username")
+                or self._first_present(author, "username", "screen_name")
+            ),
+            "text": self._first_present(tweet, "text", "full_text", "content"),
+            "lang": self._first_present(tweet, "lang"),
+            "created_at": self._first_present(tweet, "created_at", "createdAt"),
+            "view_count": self._first_present(tweet, "view_count", "viewCount"),
+            "favorite_count": self._first_present(
+                tweet, "favorite_count", "like_count", "favoriteCount"
+            ),
+            "reply_count": self._first_present(tweet, "reply_count", "replyCount"),
+            "retweet_count": self._first_present(
+                tweet, "retweet_count", "retweetCount"
+            ),
         }
 
     def _normalize_profile(self, profile: Mapping[str, Any]) -> dict[str, Any]:
@@ -237,32 +266,46 @@ class XquikClient:
             if isinstance(profile.get("public_metrics"), dict)
             else {}
         )
+        followers_count = self._first_present(
+            profile, "followers_count", "followersCount"
+        )
+        if followers_count is None:
+            followers_count = self._first_present(metrics, "followers_count")
+
+        following_count = self._first_present(
+            profile, "following_count", "followingCount"
+        )
+        if following_count is None:
+            following_count = self._first_present(metrics, "following_count")
+
         return {
-            "id": profile.get("id") or profile.get("userId") or profile.get("user_id"),
-            "name": profile.get("name"),
-            "username": profile.get("username") or profile.get("screen_name"),
-            "created_at": profile.get("created_at") or profile.get("createdAt"),
-            "profile_image_url": profile.get("profile_image_url")
-            or profile.get("profileImageUrl"),
-            "url": profile.get("url"),
-            "location": profile.get("location"),
-            "description": profile.get("description") or profile.get("bio"),
-            "description_urls": profile.get("description_urls")
-            or profile.get("descriptionUrls"),
-            "is_blue_verified": profile.get("is_blue_verified")
-            or profile.get("isBlueVerified"),
-            "verified": profile.get("verified"),
-            "possibly_sensitive": profile.get("possibly_sensitive")
-            or profile.get("possiblySensitive"),
-            "can_dm": profile.get("can_dm") or profile.get("canDm"),
-            "followers_count": profile.get("followers_count")
-            or profile.get("followersCount")
-            or metrics.get("followers_count"),
-            "fast_followers_count": profile.get("fast_followers_count")
-            or profile.get("fastFollowersCount"),
-            "normal_followers_count": profile.get("normal_followers_count")
-            or profile.get("normalFollowersCount"),
-            "following_count": profile.get("following_count")
-            or profile.get("followingCount")
-            or metrics.get("following_count"),
+            "id": self._first_present(profile, "id", "userId", "user_id"),
+            "name": self._first_present(profile, "name"),
+            "username": self._first_present(profile, "username", "screen_name"),
+            "created_at": self._first_present(profile, "created_at", "createdAt"),
+            "profile_image_url": self._first_present(
+                profile, "profile_image_url", "profileImageUrl"
+            ),
+            "url": self._first_present(profile, "url"),
+            "location": self._first_present(profile, "location"),
+            "description": self._first_present(profile, "description", "bio"),
+            "description_urls": self._first_present(
+                profile, "description_urls", "descriptionUrls"
+            ),
+            "is_blue_verified": self._first_present(
+                profile, "is_blue_verified", "isBlueVerified"
+            ),
+            "verified": self._first_present(profile, "verified"),
+            "possibly_sensitive": self._first_present(
+                profile, "possibly_sensitive", "possiblySensitive"
+            ),
+            "can_dm": self._first_present(profile, "can_dm", "canDm"),
+            "followers_count": followers_count,
+            "fast_followers_count": self._first_present(
+                profile, "fast_followers_count", "fastFollowersCount"
+            ),
+            "normal_followers_count": self._first_present(
+                profile, "normal_followers_count", "normalFollowersCount"
+            ),
+            "following_count": following_count,
         }

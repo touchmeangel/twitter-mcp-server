@@ -1,89 +1,90 @@
 import json
 import unittest
 
-from urllib.error import HTTPError
-
 from xquik_client import XquikClient, XquikError
 
 
 class FakeResponse:
-    def __init__(self, payload):
+    def __init__(self, payload, status=200, reason="OK"):
         self.payload = payload
+        self.status = status
+        self.reason = reason
 
-    def __enter__(self):
+    async def __aenter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    async def __aexit__(self, exc_type, exc_value, traceback):
         return False
 
-    def read(self):
+    async def read(self):
         return json.dumps(self.payload).encode("utf-8")
 
-    def close(self):
-        return None
 
-
-class FakeOpener:
-    def __init__(self, payload):
-        self.payload = payload
+class FakeSession:
+    def __init__(self, payload, status=200, reason="OK"):
+        self.response = FakeResponse(payload, status=status, reason=reason)
         self.requests = []
 
-    def __call__(self, request, timeout):
-        self.requests.append((request, timeout))
-        return FakeResponse(self.payload)
+    def request(self, method, url, **kwargs):
+        self.requests.append((method, url, kwargs))
+        return self.response
 
 
-class XquikClientTest(unittest.TestCase):
-    def test_search_tweets_builds_query_and_normalizes_results(self):
-        opener = FakeOpener(
+class XquikClientTest(unittest.IsolatedAsyncioTestCase):
+    async def test_search_tweets_builds_query_and_normalizes_results(self):
+        session = FakeSession(
             {
                 "tweets": [
                     {
                         "tweetId": "1",
                         "content": "hello",
                         "user": {"screen_name": "alice"},
+                        "viewCount": 0,
                         "favoriteCount": 3,
                         "retweetCount": 2,
                     }
                 ]
             }
         )
-        client = XquikClient(api_key="xq_test", opener=opener)
+        client = XquikClient(api_key="xq_test", session=session)
 
-        result = client.search_tweets("ai agents", "Latest", 5)
+        result = await client.search_tweets("ai agents", "Latest", 5)
 
-        request, timeout = opener.requests[0]
-        self.assertEqual(timeout, 30)
-        self.assertIn("/api/v1/x/tweets/search?", request.full_url)
-        self.assertIn("q=ai+agents", request.full_url)
-        self.assertIn("queryType=Latest", request.full_url)
-        self.assertEqual(request.get_header("X-api-key"), "xq_test")
+        method, url, kwargs = session.requests[0]
+        self.assertEqual(method, "GET")
+        self.assertIn("/api/v1/x/tweets/search?", url)
+        self.assertIn("q=ai+agents", url)
+        self.assertIn("queryType=Latest", url)
+        self.assertEqual(kwargs["headers"]["x-api-key"], "xq_test")
         self.assertEqual(result[0]["id"], "1")
         self.assertEqual(result[0]["author_username"], "alice")
+        self.assertEqual(result[0]["view_count"], 0)
         self.assertEqual(result[0]["favorite_count"], 3)
 
-    def test_get_profile_accepts_bearer_tokens(self):
-        opener = FakeOpener(
+    async def test_get_profile_accepts_bearer_tokens(self):
+        session = FakeSession(
             {
                 "data": {
                     "id": "42",
                     "screen_name": "alice",
-                    "public_metrics": {"followers_count": 9, "following_count": 4},
+                    "public_metrics": {"followers_count": 0, "following_count": 4},
+                    "isBlueVerified": False,
                 }
             }
         )
-        client = XquikClient(api_key="plain-token", opener=opener)
+        client = XquikClient(api_key="plain-token", session=session)
 
-        result = client.get_profile("@alice")
+        result = await client.get_profile("@alice")
 
-        request, _ = opener.requests[0]
-        self.assertTrue(request.full_url.endswith("/api/v1/x/users/alice"))
-        self.assertEqual(request.get_header("Authorization"), "Bearer plain-token")
+        _, url, kwargs = session.requests[0]
+        self.assertTrue(url.endswith("/api/v1/x/users/alice"))
+        self.assertEqual(kwargs["headers"]["authorization"], "Bearer plain-token")
         self.assertEqual(result["username"], "alice")
-        self.assertEqual(result["followers_count"], 9)
+        self.assertEqual(result["followers_count"], 0)
+        self.assertFalse(result["is_blue_verified"])
 
-    def test_get_tweets_reads_nested_data(self):
-        opener = FakeOpener(
+    async def test_get_tweets_reads_nested_data(self):
+        session = FakeSession(
             {
                 "data": {
                     "tweets": [
@@ -97,38 +98,38 @@ class XquikClientTest(unittest.TestCase):
                 }
             }
         )
-        client = XquikClient(api_key="xq_test", opener=opener)
+        client = XquikClient(api_key="xq_test", session=session)
 
-        result = client.get_tweets("bob", 2)
+        result = await client.get_tweets("bob", 2)
 
-        request, _ = opener.requests[0]
-        self.assertIn("/api/v1/x/users/bob/tweets?limit=2", request.full_url)
+        _, url, _ = session.requests[0]
+        self.assertIn("/api/v1/x/users/bob/tweets?limit=2", url)
         self.assertEqual(result[0]["id"], "10")
         self.assertEqual(result[0]["author_username"], "bob")
         self.assertEqual(result[0]["reply_count"], 1)
 
-    def test_post_tweet_requires_action_configuration(self):
+    async def test_post_tweet_requires_action_configuration(self):
         client = XquikClient(api_key="xq_test")
 
         with self.assertRaises(XquikError):
-            client.post_tweet("hello")
+            await client.post_tweet("hello")
 
-    def test_post_tweet_sends_account_and_reply(self):
-        opener = FakeOpener({"tweet": {"id": "99"}})
+    async def test_post_tweet_sends_account_and_reply(self):
+        session = FakeSession({"tweet": {"id": "99"}})
         client = XquikClient(
             api_key="xq_test",
             account="@alice",
             actions_enabled=True,
-            opener=opener,
+            session=session,
         )
 
-        result = client.post_tweet("hello", "88")
+        result = await client.post_tweet("hello", "88")
 
-        request, _ = opener.requests[0]
-        self.assertEqual(request.full_url, "https://xquik.com/api/v1/x/tweets")
-        self.assertEqual(request.get_method(), "POST")
+        method, url, kwargs = session.requests[0]
+        self.assertEqual(url, "https://xquik.com/api/v1/x/tweets")
+        self.assertEqual(method, "POST")
         self.assertEqual(
-            json.loads(request.data.decode("utf-8")),
+            kwargs["json"],
             {
                 "account": "@alice",
                 "text": "hello",
@@ -137,21 +138,30 @@ class XquikClientTest(unittest.TestCase):
         )
         self.assertEqual(result["tweet_id"], "99")
 
-    def test_http_errors_raise_backend_error(self):
-        class ErrorOpener:
-            def __call__(self, request, timeout):
-                raise HTTPError(
-                    request.full_url,
-                    402,
-                    "Payment Required",
-                    {},
-                    FakeResponse({"error": "insufficient_credits"}),
-                )
+    async def test_post_tweet_requires_tweet_id(self):
+        session = FakeSession({"tweet": {}})
+        client = XquikClient(
+            api_key="xq_test",
+            account="@alice",
+            actions_enabled=True,
+            session=session,
+        )
 
-        client = XquikClient(api_key="xq_test", opener=ErrorOpener())
+        with self.assertRaisesRegex(XquikError, "missing tweet id"):
+            await client.post_tweet("hello")
+
+    async def test_http_errors_raise_backend_error(self):
+        session = FakeSession(
+            {"error": "insufficient_credits"}, status=402, reason="Payment Required"
+        )
+        client = XquikClient(api_key="xq_test", session=session)
 
         with self.assertRaisesRegex(XquikError, "insufficient_credits"):
-            client.search_tweets("ai", "Top", 1)
+            await client.search_tweets("ai", "Top", 1)
+
+    def test_base_url_rejects_unsupported_schemes(self):
+        with self.assertRaisesRegex(ValueError, "http or https"):
+            XquikClient(api_key="xq_test", base_url="file:///tmp/xquik")
 
 
 if __name__ == "__main__":
