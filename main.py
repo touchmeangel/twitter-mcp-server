@@ -1,10 +1,12 @@
 import asyncio
 import json
 import logging
+import os
 from contextvars import ContextVar
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
+import httpx
 import uvicorn
 from mcp.server.fastmcp import FastMCP
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -16,6 +18,8 @@ from twikit import Client, errors
 from config import HOST, PORT
 
 logger = logging.getLogger(__name__)
+DEFAULT_XQUIK_BASE_URL = "https://xquik.com"
+XQUIK_SEARCH_PATH = "/api/v1/x/tweets/search"
 
 mcp = FastMCP(
     name="twitter-mcp-server",
@@ -24,6 +28,115 @@ mcp = FastMCP(
     streamable_http_path="/mcp",
 )
 mcp.streamable_http_app()
+
+
+def get_xquik_api_key() -> str | None:
+    return os.getenv("HERMES_TWEET_API_KEY") or os.getenv("XQUIK_API_KEY")
+
+
+def get_xquik_base_url() -> str:
+    return os.getenv("XQUIK_BASE_URL", DEFAULT_XQUIK_BASE_URL).rstrip("/")
+
+
+def should_use_xquik_search(auth: "AuthContext | None") -> bool:
+    backend = os.getenv("X_READ_BACKEND", "").lower()
+    return backend == "hermes" or (auth is None and get_xquik_api_key() is not None)
+
+
+def xquik_auth_headers(api_key: str) -> dict[str, str]:
+    if api_key.startswith("xq_"):
+        return {"x-api-key": api_key}
+    return {"Authorization": f"Bearer {api_key}"}
+
+
+def first_value(data: dict[str, Any], keys: list[str]) -> Any:
+    for key in keys:
+        value = data.get(key)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def metric_value(data: dict[str, Any], keys: list[str]) -> Any:
+    metrics = data.get("public_metrics")
+    if isinstance(metrics, dict):
+        value = first_value(metrics, keys)
+        if value is not None:
+            return value
+    return first_value(data, keys)
+
+
+def tweet_list(payload: Any) -> list[Any]:
+    if isinstance(payload, list):
+        return payload
+    if not isinstance(payload, dict):
+        return []
+
+    for key in ("data", "tweets", "results", "items"):
+        value = payload.get(key)
+        if isinstance(value, list):
+            return value
+        if isinstance(value, dict):
+            nested = tweet_list(value)
+            if nested:
+                return nested
+
+    return []
+
+
+def normalize_xquik_tweet(tweet: Any) -> dict[str, Any]:
+    if not isinstance(tweet, dict):
+        return {"text": str(tweet)}
+
+    author = tweet.get("author") or tweet.get("user")
+    author_username = None
+    if isinstance(author, dict):
+        author_username = first_value(
+            author, ["username", "screen_name", "screenName", "handle"]
+        )
+
+    return {
+        "id": first_value(tweet, ["id", "id_str", "tweet_id", "tweetId"]),
+        "in_reply_to": first_value(
+            tweet, ["in_reply_to", "in_reply_to_status_id", "reply_to"]
+        ),
+        "author_username": author_username
+        or first_value(tweet, ["author_username", "username", "screen_name", "handle"]),
+        "text": first_value(tweet, ["text", "full_text", "fullText", "content"]),
+        "lang": first_value(tweet, ["lang", "language"]),
+        "created_at": first_value(tweet, ["created_at", "createdAt", "date"]),
+        "view_count": metric_value(tweet, ["view_count", "viewCount", "views"]),
+        "favorite_count": metric_value(
+            tweet, ["favorite_count", "favoriteCount", "like_count", "likeCount"]
+        ),
+        "reply_count": metric_value(tweet, ["reply_count", "replyCount", "replies"]),
+        "retweet_count": metric_value(
+            tweet, ["retweet_count", "retweetCount", "retweets"]
+        ),
+    }
+
+
+async def search_tweets_with_xquik(query: str, count: int) -> str:
+    api_key = get_xquik_api_key()
+    if api_key is None:
+        raise RuntimeError("Hermes Tweet API key required: HERMES_TWEET_API_KEY")
+
+    url = f"{get_xquik_base_url()}{XQUIK_SEARCH_PATH}"
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.get(
+                url,
+                params={"q": query, "limit": count},
+                headers=xquik_auth_headers(api_key),
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Hermes Tweet search failed: {exc}") from exc
+    except ValueError as exc:
+        raise RuntimeError("Hermes Tweet search returned invalid JSON") from exc
+
+    return json.dumps([normalize_xquik_tweet(tweet) for tweet in tweet_list(payload)])
 
 
 @mcp.tool(description="Get recent tweets from a user")
@@ -134,6 +247,8 @@ async def search_tweets(
         raise RuntimeError("Invalid argument (count): count cant be less then 0")
 
     auth = get_auth_context()
+    if should_use_xquik_search(auth):
+        return await search_tweets_with_xquik(query, count_int)
     if auth is None:
         raise RuntimeError("Authentication required: AUTH_REQUIRED")
 

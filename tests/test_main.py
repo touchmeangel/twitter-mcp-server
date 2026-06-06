@@ -13,10 +13,13 @@ from main import (
     get_auth_context,
     get_profile,
     get_tweets,
+    get_xquik_api_key,
     like_tweet,
     post_tweet,
     search_tweets,
     set_auth_context,
+    should_use_xquik_search,
+    xquik_auth_headers,
 )
 
 # ============================================================================
@@ -39,6 +42,34 @@ def test_auth_context_none_by_default():
     """Test auth context is None when not set."""
     set_auth_context(None)
     assert get_auth_context() is None
+
+
+def test_xquik_search_backend_selection(monkeypatch):
+    """Test Hermes Tweet search backend selection rules."""
+    monkeypatch.delenv("HERMES_TWEET_API_KEY", raising=False)
+    monkeypatch.delenv("XQUIK_API_KEY", raising=False)
+    monkeypatch.delenv("X_READ_BACKEND", raising=False)
+
+    assert get_xquik_api_key() is None
+    assert should_use_xquik_search(None) is False
+
+    monkeypatch.setenv("XQUIK_API_KEY", "xq_test")
+
+    assert get_xquik_api_key() == "xq_test"
+    assert should_use_xquik_search(None) is True
+    assert should_use_xquik_search(AuthContext("token", "ct0")) is False
+
+    monkeypatch.setenv("X_READ_BACKEND", "hermes")
+
+    assert should_use_xquik_search(AuthContext("token", "ct0")) is True
+
+
+def test_xquik_auth_headers():
+    """Test Hermes Tweet API key header selection."""
+    assert xquik_auth_headers("xq_test") == {"x-api-key": "xq_test"}
+    assert xquik_auth_headers("other-token") == {
+        "Authorization": "Bearer other-token"
+    }
 
 
 # ============================================================================
@@ -80,6 +111,64 @@ async def test_search_tweets_invalid_count():
 
     with pytest.raises(RuntimeError, match="max value is 50"):
         await search_tweets("python", count="51")
+
+
+@pytest.mark.asyncio
+@patch("main.httpx.AsyncClient")
+async def test_search_tweets_with_xquik_backend(mock_client_class, monkeypatch):
+    """Test search_tweets can use Hermes Tweet without cookie auth."""
+    set_auth_context(None)
+    monkeypatch.setenv("XQUIK_API_KEY", "xq_test")
+    monkeypatch.setenv("XQUIK_BASE_URL", "https://example.test/")
+
+    mock_response = Mock()
+    mock_response.raise_for_status.return_value = None
+    mock_response.json.return_value = {
+        "data": [
+            {
+                "id": "tweet123",
+                "author": {"username": "alice"},
+                "text": "Hermes search result",
+                "createdAt": "2026-06-06T00:00:00Z",
+                "public_metrics": {
+                    "like_count": 12,
+                    "reply_count": 3,
+                    "retweet_count": 4,
+                    "views": 100,
+                },
+            }
+        ]
+    }
+
+    mock_client = AsyncMock()
+    mock_client.get.return_value = mock_response
+    mock_context = AsyncMock()
+    mock_context.__aenter__.return_value = mock_client
+    mock_context.__aexit__.return_value = None
+    mock_client_class.return_value = mock_context
+
+    result = await search_tweets("AI agents", count="2")
+    result_data = json.loads(result)
+
+    assert result_data == [
+        {
+            "id": "tweet123",
+            "in_reply_to": None,
+            "author_username": "alice",
+            "text": "Hermes search result",
+            "lang": None,
+            "created_at": "2026-06-06T00:00:00Z",
+            "view_count": 100,
+            "favorite_count": 12,
+            "reply_count": 3,
+            "retweet_count": 4,
+        }
+    ]
+    mock_client.get.assert_awaited_once_with(
+        "https://example.test/api/v1/x/tweets/search",
+        params={"q": "AI agents", "limit": 2},
+        headers={"x-api-key": "xq_test"},
+    )
 
 
 # ============================================================================

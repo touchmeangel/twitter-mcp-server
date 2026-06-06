@@ -71,6 +71,29 @@ Authorization: Bearer <auth_token>:<ct0>
 ```
 `auth_token` and `ct0` are X (Twitter) cookies which allow access to your account.
 
+### Optional Hermes Tweet / Xquik Search Backend
+
+`search_tweets` can use Hermes Tweet through Xquik for read-only search when
+cookie auth is not available, or when explicitly selected:
+
+```bash
+docker run -i --rm --name twitter-mcp-server \
+  -e HERMES_TWEET_API_KEY=xq_your_key \
+  -e X_READ_BACKEND=hermes \
+  touchmeangel/twitter-mcp-server
+```
+
+Supported variables:
+
+- `HERMES_TWEET_API_KEY` or `XQUIK_API_KEY` - API key for Hermes Tweet / Xquik.
+- `X_READ_BACKEND=hermes` - Force `search_tweets` through Hermes Tweet.
+- `XQUIK_BASE_URL` - Optional override for self-hosted or proxy deployments.
+
+The default behavior is unchanged when these variables are not set. Interaction
+tools such as `post_tweet`, `like_tweet`, `retweet`, `follow_user`, timelines,
+profiles, and replies still use the existing cookie-authenticated Twitter
+client path.
+
 ## Error Handling
 
 The server implements comprehensive error handling:
